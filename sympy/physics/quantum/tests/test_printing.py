@@ -1,5 +1,8 @@
 # -*- encoding: utf-8 -*-
 """
+When tests are added or changed, please update the ipython notebook and .py
+files 'examples/notebooks/quantum printing tests.(ipynb/py)'
+
 TODO:
 * Fix problems with Issue 2510, ascii printing using unicode
 * Address Issue 2251, printing of spin states
@@ -81,6 +84,7 @@ u"""\
 
 def test_cg():
     cg = CG(1,2,3,4,5,6)
+    wigner3j = Wigner3j(1,2,3,4,5,6)
     assert str(cg) == 'CG(1, 2, 3, 4, 5, 6)'
     ascii_str = \
 """\
@@ -98,7 +102,6 @@ C       \n\
     assert upretty(cg) == ucode_str
     assert latex(cg) == r'C^{5,6}_{1,2,3,4}'
     sT(cg, "CG(Integer(1), Integer(2), Integer(3), Integer(4), Integer(5), Integer(6))")
-    wigner3j = Wigner3j(1,2,3,4,5,6)
     assert str(wigner3j) == 'Wigner3j(1,3,5,2,4,6)'
     ascii_str = \
 """\
