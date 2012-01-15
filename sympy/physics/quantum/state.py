@@ -597,7 +597,7 @@ class Wavefunction(Function):
     >>> x = Symbol('x')
     >>> n = 1
     >>> L = 1
-    >>> g = Piecewise((0, x < 0), (0, x > L), (sqrt(2//L)*sin(n*pi*x/L), True))
+    >>> g = Piecewise((0, x < 0), (0, x > L), sqrt(2//L)*sin(n*pi*x/L))
     >>> f = Wavefunction(g, x)
     >>> f.norm
     1
