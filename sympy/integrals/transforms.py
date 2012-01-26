@@ -909,8 +909,8 @@ def _simplifyconds(expr, s, a):
 @_noconds
 def _laplace_transform(f, t, s_, simplify=True):
     """ The backend function for laplace transforms. """
-    from sympy import (re, Max, exp, pi, Abs, Min, periodic_argument as arg,
-                       cos, Wild, symbols, polar_lift)
+    from sympy import (re, Max, exp, pi, Min, periodic_argument as arg, cos,
+                       Wild, symbols, polar_lift)
     s = Dummy('s')
     F = integrate(exp(-s*t) * f, (t, 0, oo))
 
