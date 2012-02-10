@@ -1,7 +1,8 @@
+from sympy.assumptions.ask import ask
 from sympy.core import Add, Basic, Expr, Function, S, sympify
 from sympy.core.containers import Tuple
 from sympy.core.relational import Equality, Relational
-from sympy.logic.boolalg import Boolean
+from sympy.logic.boolalg import Boolean, BooleanValue
 
 from warnings import warn
 from sympy.core.compatibility import SymPyDeprecationWarning
@@ -96,7 +97,7 @@ class Piecewise(Function):
             raise ValueError("Only one otherwise statement can be specified, got: %s" % ', '.join(oth))
 
         # deprecated otherwise behavior
-        if len(ecs) > 0 and ecs[-1][1] is True and ecs[-1] == args[-1]:
+        if len(ecs) > 0 and ecs[-1][1] is S.BooleanTrue and ecs[-1] == args[-1]:
             oth = ecs[-1][0]
             ecs = ecs[:-1]
             warn('Pass "otherwise" expression as parameter rather than (expr, True). ' \
@@ -108,24 +109,11 @@ class Piecewise(Function):
         # Allow explicit evaluate=False to stop evaluation of nested Piecewise
         if evaluate is not False and (any([ isinstance(expr, Piecewise) for (expr, _) in ecs ]) or isinstance(oth, Piecewise)):
             ecs, oth = cls._collapse_piecewise_args(ecs, oth)
-        # TODO: See Issue 3025
-        # When evaluate=False, remove False conds and move True cond to otherwise
-        # Should subs True for Basic True, False for Basic False when evaluate!=False
-        if any([ isinstance(cond, bool) for (_, cond) in ecs ]):
-            new_ecs = []
-            if evaluate is False:
-                for e, c in ecs:
-                    cond_eval = cls.__eval_cond(c)
-                    if cond_eval is False:
-                        continue
-                    elif cond_eval is True:
-                        oth = e
-                        break
-                    else:
-                        new_ecs.append(Tuple(e,c))
-                ecs = new_ecs
-            else:
-                evaluate = True
+
+        # Evaluate when BooleanValues are in the cond's
+        # Allow explicit evaluate=False to stop evaluation
+        if evaluate is not False and any([ isinstance(cond, BooleanValue) for (_, cond) in ecs ]):
+            evaluate = True
         # Having no expr/cond pairs should also trigger evaluation unless explicitly False
         if len(ecs) == 0 and evaluate is not False:
             return oth
@@ -172,7 +160,7 @@ class Piecewise(Function):
         ecs = args[:-1]
         oth = args[-1]
         for expr, cond in ecs:
-            cond_eval = cls.__eval_cond(cond)
+            cond_eval = ask(cond)
             if cond_eval:
                 return expr
         return oth
@@ -266,10 +254,10 @@ class Piecewise(Function):
         #    -  eg x < 1, x < 3 -> [oo,1],[1,3] instead of [oo,1],[oo,3]
         # 3) Sort the intervals to make it easier to find correct exprs
         for expr, cond in self.exprcondpairs:
-            if cond is True:
+            if cond is S.BooleanTrue:
                 default = expr
                 break
-            elif cond is False:
+            elif cond is S.BooleanFalse:
                 continue
             elif isinstance(cond, Equality):
                 continue
@@ -290,13 +278,13 @@ class Piecewise(Function):
                 # Part 2: remove any interval overlap.  For any conflicts, the
                 # interval already there wins, and the incoming interval updates
                 # its bounds accordingly.
-                if self.__eval_cond(lower < int_expr[n][1]) and \
-                        self.__eval_cond(lower >= int_expr[n][0]):
+                if ask(lower < int_expr[n][1]) and \
+                        ask(lower >= int_expr[n][0]):
                     lower = int_expr[n][1]
-                if self.__eval_cond(upper > int_expr[n][0]) and \
-                        self.__eval_cond(upper <= int_expr[n][1]):
+                if ask(upper > int_expr[n][0]) and \
+                        ask(upper <= int_expr[n][1]):
                     upper = int_expr[n][0]
-            if self.__eval_cond(lower < upper):  # Is it still an interval?
+            if ask(lower < upper):  # Is it still an interval?
                 int_expr.append((lower, upper, expr))
         int_expr.sort(key=lambda x:x[0])
 
@@ -332,13 +320,6 @@ class Piecewise(Function):
         if self.otherwise is not S.NaN:
             args.append( self.otherwise )
         return Add(*args).as_leading_term(x)
-
-    @classmethod
-    def __eval_cond(cls, cond):
-        """ Returns cond if it's a boolean, otherwise it is undecidable and returns None. """
-        if isinstance(cond,bool):
-            return cond
-        return None
 
     @classmethod
     def _collapse_piecewise_args(cls, ecs, oth):

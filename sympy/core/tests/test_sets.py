@@ -270,11 +270,11 @@ def test_union_contains():
     raises(TypeError, "x in i3")
     e = i3.contains(x)
     assert e == Or(And(0 <= x, x <= 1), And(2 <= x, x <= 3))
-    assert e.subs(x, -0.5) is False
-    assert e.subs(x, 0.5) is True
-    assert e.subs(x, 1.5) is False
-    assert e.subs(x, 2.5) is True
-    assert e.subs(x, 3.5) is False
+    assert e.subs(x, -0.5) is S(False)
+    assert e.subs(x, 0.5) is S(True)
+    assert e.subs(x, 1.5) is S(False)
+    assert e.subs(x, 2.5) is S(True)
+    assert e.subs(x, 3.5) is S(False)
 
     U = Interval(0,2, True,True) + Interval(10,oo) + FiniteSet(-1,2,5,6)
     assert all(el not in U for el in [0,4,-oo])

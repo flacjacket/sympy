@@ -3,6 +3,7 @@ Handlers for predicates related to set membership: integer, rational, etc.
 """
 from sympy.assumptions import Q, ask
 from sympy.assumptions.handlers import CommonHandler
+from sympy.core.singleton import S
 
 class AskIntegerHandler(CommonHandler):
     """
@@ -14,8 +15,8 @@ class AskIntegerHandler(CommonHandler):
     def _number(expr, assumptions):
         # helper method
         if expr.as_real_imag()[1] == 0:
-            return expr.evalf(1) == expr
-        return False
+            return S(expr.evalf(1) == expr)
+        return S(False)
 
     @staticmethod
     def Add(expr, assumptions):
@@ -38,63 +39,64 @@ class AskIntegerHandler(CommonHandler):
         """
         if expr.is_number:
             return AskIntegerHandler._number(expr, assumptions)
-        _output = True
+        _output = S(True)
         for arg in expr.args:
             if not ask(Q.integer(arg), assumptions):
                 if arg.is_Rational:
                     if arg.q == 2:
                         return ask(Q.even(2*expr), assumptions)
                     if ~(arg.q & 1):
-                        return None
+                        return S(None)
                 elif ask(Q.irrational(arg), assumptions):
                     if _output:
-                        _output = False
+                        _output = S(False)
                     else:
-                        return
+                        return S(None)
                 else:
-                    return
+                    return S(None)
         else:
             return _output
+        return S(None)
 
     Pow = Add
 
     @staticmethod
     def int(expr, assumptions):
-        return True
+        return S(True)
 
     @staticmethod
     def Integer(expr, assumptions):
-        return True
+        return S(True)
 
     @staticmethod
     def Rational(expr, assumptions):
         # rationals with denominator one get
         # evaluated to Integers
-        return False
+        return S(False)
 
     @staticmethod
     def Float(expr, assumptions):
-        return int(expr) == expr
+        return S(int(expr) == expr)
 
     @staticmethod
     def Pi(expr, assumptions):
-        return False
+        return S(False)
 
     @staticmethod
     def Exp1(expr, assumptions):
-        return False
+        return S(False)
 
     @staticmethod
     def Infinity(expr, assumptions):
-        return False
+        return S(False)
 
     @staticmethod
     def NegativeInfinity(expr, assumptions):
-        return False
+        return S(False)
 
     @staticmethod
     def ImaginaryUnit(expr, assumptions):
-        return False
+        return S(False)
 
     @staticmethod
     def Abs(expr, assumptions):
@@ -115,7 +117,7 @@ class AskRationalHandler(CommonHandler):
         """
         if expr.is_number:
             if expr.as_real_imag()[1]:
-                return False
+                return S(False)
         return test_closed_group(expr, assumptions, Q.rational)
 
     Mul = Add
@@ -131,36 +133,37 @@ class AskRationalHandler(CommonHandler):
             return ask(Q.rational(expr.base), assumptions)
         elif ask(Q.rational(expr.exp), assumptions):
             if ask(Q.prime(expr.base), assumptions):
-                return False
+                return S(False)
+        return S(None)
 
     @staticmethod
     def Rational(expr, assumptions):
-        return True
+        return S(True)
 
     @staticmethod
     def Float(expr, assumptions):
         # it's finite-precission
-        return True
+        return S(True)
 
     @staticmethod
     def ImaginaryUnit(expr, assumptions):
-        return False
+        return S(False)
 
     @staticmethod
     def Infinity(expr, assumptions):
-        return False
+        return S(False)
 
     @staticmethod
     def NegativeInfinity(expr, assumptions):
-        return False
+        return S(False)
 
     @staticmethod
     def Pi(expr, assumptions):
-        return False
+        return S(False)
 
     @staticmethod
     def Exp1(expr, assumptions):
-        return False
+        return S(False)
 
 class AskIrrationalHandler(CommonHandler):
 
@@ -169,8 +172,8 @@ class AskIrrationalHandler(CommonHandler):
         _real = ask(Q.real(expr), assumptions)
         if _real:
             _rational = ask(Q.rational(expr), assumptions)
-            if _rational is None: return None
-            return not _rational
+            if _rational is S(None): return S(None)
+            return S(not _rational)
         else: return _real
 
 class AskRealHandler(CommonHandler):
@@ -181,7 +184,7 @@ class AskRealHandler(CommonHandler):
 
     @staticmethod
     def _number(expr, assumptions):
-        return not expr.as_real_imag()[1]
+        return S(not expr.as_real_imag()[1])
 
     @staticmethod
     def Add(expr, assumptions):
@@ -202,7 +205,7 @@ class AskRealHandler(CommonHandler):
         """
         if expr.is_number:
             return AskRealHandler._number(expr, assumptions)
-        result = True
+        result = S(True)
         for arg in expr.args:
             if ask(Q.real(arg), assumptions):
                 pass
@@ -212,6 +215,7 @@ class AskRealHandler(CommonHandler):
                 break
         else:
             return result
+        return S(None)
 
     @staticmethod
     def Pow(expr, assumptions):
@@ -225,58 +229,60 @@ class AskRealHandler(CommonHandler):
             return AskRealHandler._number(expr, assumptions)
         if ask(Q.real(expr.base), assumptions):
             if ask(Q.integer(expr.exp), assumptions):
-                return True
+                return S(True)
             elif expr.exp.is_Rational:
                 if (expr.exp.q % 2 == 0):
-                    return ask(Q.real(expr.base), assumptions) and \
-                       not ask(Q.negative(expr.base), assumptions)
-                else: return True
+                    return S(ask(Q.real(expr.base), assumptions) and \
+                       not ask(Q.negative(expr.base), assumptions))
+                else: return S(True)
             elif ask(Q.real(expr.exp), assumptions):
                 if ask(Q.positive(expr.base), assumptions):
-                    return True
+                    return S(True)
+        return S(None)
 
     @staticmethod
     def Rational(expr, assumptions):
-        return True
+        return S(True)
 
     @staticmethod
     def Float(expr, assumptions):
-        return True
+        return S(True)
 
     @staticmethod
     def Pi(expr, assumptions):
-        return True
+        return S(True)
 
     @staticmethod
     def Exp1(expr, assumptions):
-        return True
+        return S(True)
 
     @staticmethod
     def Abs(expr, assumptions):
-        return True
+        return S(True)
 
     @staticmethod
     def re(expr, assumptions):
-        return True
+        return S(True)
 
     im = re
 
     @staticmethod
     def ImaginaryUnit(expr, assumptions):
-        return False
+        return S(False)
 
     @staticmethod
     def Infinity(expr, assumptions):
-        return False
+        return S(False)
 
     @staticmethod
     def NegativeInfinity(expr, assumptions):
-        return False
+        return S(False)
 
     @staticmethod
     def sin(expr, assumptions):
         if ask(Q.real(expr.args[0]), assumptions):
-            return True
+            return S(True)
+        return S(None)
 
     cos, exp = sin, sin
 
@@ -295,11 +301,11 @@ class AskExtendedRealHandler(AskRealHandler):
 
     @staticmethod
     def Infinity(expr, assumptions):
-        return True
+        return S(True)
 
     @staticmethod
     def NegativeInfinity(expr, assumptions):
-        return True
+        return S(True)
 
 class AskComplexHandler(CommonHandler):
     """
@@ -315,27 +321,27 @@ class AskComplexHandler(CommonHandler):
 
     @staticmethod
     def Number(expr, assumptions):
-        return True
+        return S(True)
 
     @staticmethod
     def NumberSymbol(expr, assumptions):
-        return True
+        return S(True)
 
     @staticmethod
     def Abs(expr, assumptions):
-        return True
+        return S(True)
 
     @staticmethod
     def ImaginaryUnit(expr, assumptions):
-        return True
+        return S(True)
 
     @staticmethod
     def Infinity(expr, assumptions):
-        return False
+        return S(False)
 
     @staticmethod
     def NegativeInfinity(expr, assumptions):
-        return False
+        return S(False)
 
     sin, cos, exp, re, im = [Abs]*5 # they are all complex functions
 
@@ -349,7 +355,7 @@ class AskImaginaryHandler(CommonHandler):
     @staticmethod
     def _number(expr, assumptions):
         # helper method
-        return not expr.as_real_imag()[0]
+        return S(not expr.as_real_imag()[0])
 
     @staticmethod
     def Add(expr, assumptions):
@@ -370,10 +376,11 @@ class AskImaginaryHandler(CommonHandler):
                 break
         else:
             if reals == 0:
-                return True
+                return S(True)
             if reals == 1 or (len(expr.args) == reals):
                 # two reals could sum 0 thus giving an imaginary
-                return False
+                return S(False)
+        return S(None)
 
     @staticmethod
     def Mul(expr, assumptions):
@@ -383,7 +390,7 @@ class AskImaginaryHandler(CommonHandler):
         """
         if expr.is_number:
             return AskImaginaryHandler._number(expr, assumptions)
-        result = False
+        result = S(False)
         reals = 0
         for arg in expr.args:
             if ask(Q.imaginary(arg), assumptions):
@@ -392,20 +399,21 @@ class AskImaginaryHandler(CommonHandler):
                 break
         else:
             if reals == len(expr.args):
-                return False
+                return S(False)
             return result
+        return S(None)
 
     Pow = Add
 
     @staticmethod
     def Number(expr, assumptions):
-        return not (expr.as_real_imag()[1] == 0)
+        return S(not (expr.as_real_imag()[1] == 0))
 
     NumberSymbol = Number
 
     @staticmethod
     def ImaginaryUnit(expr, assumptions):
-        return True
+        return S(True)
 
 class AskAlgebraicHandler(CommonHandler):
     """Handler for Q.algebraic key. """
@@ -420,23 +428,23 @@ class AskAlgebraicHandler(CommonHandler):
 
     @staticmethod
     def Pow(expr, assumptions):
-        return expr.exp.is_Rational and ask(Q.algebraic(expr.base), assumptions)
+        return S(expr.exp.is_Rational and ask(Q.algebraic(expr.base), assumptions))
 
     @staticmethod
     def Number(expr, assumptions):
-        return False
+        return S(False)
 
     @staticmethod
     def Rational(expr, assumptions):
-        return expr.q != 0
+        return S(expr.q != 0)
 
     @staticmethod
     def ImaginaryUnit(expr, assumptions):
-        return True
+        return S(True)
 
     @staticmethod
     def AlgebraicNumber(expr, assumptions):
-        return True
+        return S(True)
 
 #### Helper methods
 
@@ -445,13 +453,14 @@ def test_closed_group(expr, assumptions, key):
     Test for membership in a group with respect
     to the current operation
     """
-    result = True
+    result = S(True)
     for arg in expr.args:
         _out = ask(key(arg), assumptions)
-        if _out is None: break
-        elif _out is False:
-            if result: result = False
+        if _out is S(None): return S(None)
+        elif _out is S(False):
+            if result: result = S(False)
             else: break
     else:
         return result
+    return S(None)
 

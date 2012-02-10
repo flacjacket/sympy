@@ -1,5 +1,5 @@
 """Module for querying SymPy objects about assumptions."""
-from sympy.core import sympify
+from sympy.core import sympify, S
 from sympy.logic.boolalg import to_cnf, And, Not, Or, Implies, Equivalent
 from sympy.logic.inference import satisfiable
 from sympy.assumptions.assume import (global_assumptions, Predicate,
@@ -85,41 +85,41 @@ def ask(proposition, assumptions=True, context=global_assumptions):
 
     # direct resolution method, no logic
     res = key(expr)._eval_ask(assumptions)
-    if res is not None:
+    if res is not S(None):
         return res
 
     if assumptions is True:
-        return
+        return S(None)
 
     if not expr.is_Atom:
-        return
+        return S(None)
 
     local_facts = _extract_facts(assumptions, expr)
     if local_facts is None or local_facts is True:
-        return
+        return S(None)
 
     # See if there's a straight-forward conclusion we can make for the inference
     if local_facts.is_Atom:
         if key in known_facts_dict[local_facts]:
-            return True
+            return S(True)
         if Not(key) in known_facts_dict[local_facts]:
-            return False
+            return S(False)
     elif local_facts.func is And and all(k in known_facts_dict for k in local_facts.args):
         for assum in local_facts.args:
             if assum.is_Atom:
                 if key in known_facts_dict[assum]:
-                    return True
+                    return S(True)
                 if Not(key) in known_facts_dict[assum]:
-                    return False
+                    return S(False)
             elif assum.func is Not and assum.args[0].is_Atom:
                 if key in known_facts_dict[assum]:
-                    return False
+                    return S(False)
                 if Not(key) in known_facts_dict[assum]:
-                    return True
+                    return S(True)
     elif (isinstance(key, Predicate) and
             local_facts.func is Not and local_facts.args[0].is_Atom):
         if local_facts.args[0] in known_facts_dict[key]:
-            return False
+            return S(False)
 
     # Failing all else, we do a full logical inference
     return ask_full_inference(key, local_facts)
@@ -131,10 +131,10 @@ def ask_full_inference(proposition, assumptions):
 
     """
     if not satisfiable(And(known_facts_cnf, assumptions, proposition)):
-        return False
+        return S(False)
     if not satisfiable(And(known_facts_cnf, assumptions, Not(proposition))):
-        return True
-    return None
+        return S(True)
+    return S(None)
 
 
 

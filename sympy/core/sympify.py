@@ -95,8 +95,13 @@ def sympify(a, locals=None, convert_xor=True, strict=False, rational=False):
     if cls in (bool, type(None)):
         if strict:
             raise SympifyError(a)
-        else:
-            return a
+        from singleton import S
+        if a is True:
+            return S.BooleanTrue
+        elif a is False:
+            return S.BooleanFalse
+        elif a is None:
+            return S.BooleanNone
 
     try:
         return converter[cls](a)

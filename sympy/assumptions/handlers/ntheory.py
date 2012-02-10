@@ -3,6 +3,7 @@ Handlers for keys related to number theory: prime, even, odd, etc.
 """
 from sympy.assumptions import Q, ask
 from sympy.assumptions.handlers import CommonHandler
+from sympy.core.singleton import S
 from sympy.ntheory import isprime
 
 class AskPrimeHandler(CommonHandler):
@@ -15,8 +16,8 @@ class AskPrimeHandler(CommonHandler):
     def _number(expr, assumptions):
         # helper method
         if (expr.as_real_imag()[1] == 0) and int(expr.evalf()) == expr:
-            return isprime(expr.evalf(1))
-        return False
+            return S(isprime(expr.evalf(1)))
+        return S(False)
 
     @staticmethod
     def Basic(expr, assumptions):
@@ -25,6 +26,7 @@ class AskPrimeHandler(CommonHandler):
         # is solved
         if expr.is_number:
             return AskPrimeHandler._number(expr, assumptions)
+        return S(None)
 
     @staticmethod
     def Mul(expr, assumptions):
@@ -36,7 +38,8 @@ class AskPrimeHandler(CommonHandler):
             else: break
         else:
             # a product of integers can't be a prime
-            return False
+            return S(False)
+        return S(None)
 
     @staticmethod
     def Pow(expr, assumptions):
@@ -47,15 +50,16 @@ class AskPrimeHandler(CommonHandler):
             return AskPrimeHandler._number(expr, assumptions)
         if ask(Q.integer(expr.exp), assumptions) and \
                 ask(Q.integer(expr.base), assumptions):
-            return False
+            return S(False)
+        return S(None)
 
     @staticmethod
     def Integer(expr, assumptions):
-        return isprime(expr)
+        return S(isprime(expr))
 
     @staticmethod
     def Rational(expr, assumptions):
-        return False
+        return S(False)
 
     @staticmethod
     def Float(expr, assumptions):
@@ -63,15 +67,15 @@ class AskPrimeHandler(CommonHandler):
 
     @staticmethod
     def Infinity(expr, assumptions):
-        return False
+        return S(False)
 
     @staticmethod
     def NegativeInfinity(expr, assumptions):
-        return False
+        return S(False)
 
     @staticmethod
     def ImaginaryUnit(expr, assumptions):
-        return False
+        return S(False)
 
     @staticmethod
     def NumberSymbol(expr, assumptions):
@@ -86,8 +90,8 @@ class AskCompositeHandler(CommonHandler):
             _integer = ask(Q.integer(expr), assumptions)
             if _integer:
                 _prime = ask(Q.prime(expr), assumptions)
-                if _prime is None: return
-                return not _prime
+                if _prime is S(None): return _prime
+                return S(not _prime)
             else: return _integer
         else: return _positive
 
@@ -97,13 +101,14 @@ class AskEvenHandler(CommonHandler):
     def _number(expr, assumptions):
         # helper method
         if (expr.as_real_imag()[1] == 0) and expr.evalf(1) == expr:
-            return float(expr.evalf()) % 2 == 0
-        else: return False
+            return S(float(expr.evalf()) % 2 == 0)
+        else: return S(False)
 
     @staticmethod
     def Basic(expr, assumptions):
         if expr.is_number:
             return AskEvenHandler._number(expr, assumptions)
+        return S(None)
 
     @staticmethod
     def Mul(expr, assumptions):
@@ -131,9 +136,10 @@ class AskEvenHandler(CommonHandler):
                 irrational = True
             else: break
         else:
-            if irrational: return False
-            if even: return True
-            if odd == len(expr.args): return False
+            if irrational: return S(False)
+            if even: return S(True)
+            if odd == len(expr.args): return S(False)
+        return S(None)
 
     @staticmethod
     def Add(expr, assumptions):
@@ -148,35 +154,36 @@ class AskEvenHandler(CommonHandler):
         """
         if expr.is_number:
             return AskEvenHandler._number(expr, assumptions)
-        _result = True
+        _result = S(True)
         for arg in expr.args:
             if ask(Q.even(arg), assumptions):
                 pass
             elif ask(Q.odd(arg), assumptions):
-                _result = not _result
+                _result = S(not _result)
             else: break
         else:
             return _result
+        return S(None)
 
     @staticmethod
     def Integer(expr, assumptions):
-        return not bool(expr.p & 1)
+        return S(not bool(expr.p & 1))
 
     @staticmethod
     def Rational(expr, assumptions):
-        return False
+        return S(False)
 
     @staticmethod
     def Float(expr, assumptions):
-        return expr % 2 == 0
+        return S(expr % 2 == 0)
 
     @staticmethod
     def Infinity(expr, assumptions):
-        return False
+        return S(False)
 
     @staticmethod
     def NegativeInfinity(expr, assumptions):
-        return False
+        return S(False)
 
     @staticmethod
     def NumberSymbol(expr, assumptions):
@@ -184,22 +191,25 @@ class AskEvenHandler(CommonHandler):
 
     @staticmethod
     def ImaginaryUnit(expr, assumptions):
-        return False
+        return S(False)
 
     @staticmethod
     def Abs(expr, assumptions):
         if ask(Q.real(expr.args[0]), assumptions):
             return ask(Q.even(expr.args[0]), assumptions)
+        return S(None)
 
     @staticmethod
     def re(expr, assumptions):
         if ask(Q.real(expr.args[0]), assumptions):
             return ask(Q.even(expr.args[0]), assumptions)
+        return S(None)
 
     @staticmethod
     def im(expr, assumptions):
         if ask(Q.real(expr.args[0]), assumptions):
-            return True
+            return S(True)
+        return S(None)
 
 class AskOddHandler(CommonHandler):
     """
@@ -212,6 +222,6 @@ class AskOddHandler(CommonHandler):
         _integer = ask(Q.integer(expr), assumptions)
         if _integer:
             _even = ask(Q.even(expr), assumptions)
-            if _even is None: return None
-            return not _even
+            if _even is S(None): return S(None)
+            return S(not _even)
         return _integer

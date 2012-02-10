@@ -258,10 +258,16 @@ def test_piecewise_evaluate():
 
     # Explicit evaluate=False stops automatic evaluation
     assert Piecewise((x, True), S.NaN) == x
-    assert Piecewise((x, True), S.NaN, evaluate=False).is_Piecewise
-    assert Piecewise((x, True), S.NaN, evaluate=False) == Piecewise(x, evaluate=False)
-    assert Piecewise((x, x < 1), (0, True), S.NaN) == 0
-    assert Piecewise((x, x < 1), (0, True), S.NaN, evaluate=False) == Piecewise((x, x < 1), 0)
+    p = Piecewise((x, True), S.NaN, evaluate=False)
+    assert p.is_Piecewise
+    assert p.otherwise == S.NaN
+    assert p.exprcondpairs == ((x, S.BooleanTrue),)
+    assert p.doit() == x
+    p = Piecewise((x, False), S.NaN, evaluate=False)
+    assert p.is_Piecewise
+    assert p.otherwise == S.NaN
+    assert p.exprcondpairs == ((x, S.BooleanFalse),)
+    assert p.doit() == S.NaN
 
     # Automatic evaluation of bool conds
     assert Piecewise((x, 1 > 2), (-x, False)) == S.NaN
@@ -283,14 +289,3 @@ def test_piecewise_evaluate():
     assert p1.is_Piecewise
     assert p1.doit() == x**2
     assert p1.doit(piecewise=False) == p1
-
-@XFAIL
-def test_piecewise_evaluate_false():
-    # Requires Issue 3025
-    assert Piecewise((x, True), S.NaN, evaluate=False).is_Piecewise
-    assert Piecewise((x, 1 < 2), S.NaN, evaluate=False).is_Piecewise
-    assert Piecewise((x, 1 > 2), S.NaN, evaluate=False).is_Piecewise
-    p = Piecewise((x, x < 1), (0, True), S.NaN, evaluate=False)
-    assert p.is_Piecewise
-    assert len(p.args) == 3
-    assert Piecewise((x, 1 > 2), (-x, False), evaluate=False).is_Piecewise

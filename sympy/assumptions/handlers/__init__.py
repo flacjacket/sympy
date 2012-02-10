@@ -1,3 +1,4 @@
+from sympy.core.singleton import S
 from sympy.logic.boolalg import conjuncts
 from sympy.assumptions import Q, ask
 
@@ -10,7 +11,7 @@ class CommonHandler(AskHandler):
 
     @staticmethod
     def NaN(expr, assumptions):
-        return False
+        return S(False)
 
 class AskCommutativeHandler(CommonHandler):
     """
@@ -22,31 +23,35 @@ class AskCommutativeHandler(CommonHandler):
         """Objects are expected to be commutative unless otherwise stated"""
         assumps = conjuncts(assumptions)
         if Q.commutative(expr) in assumps:
-            return True
+            return S(True)
         elif ~Q.commutative(expr) in assumps:
-            return False
-        return True
+            return S(False)
+        return S(True)
 
     @staticmethod
     def Basic(expr, assumptions):
         for arg in expr.args:
             if not ask(Q.commutative(arg), assumptions):
-                return False
-        return True
+                return S(False)
+        return S(True)
 
     @staticmethod
     def Number(expr, assumptions):
-        return True
+        return S(True)
 
     @staticmethod
     def NaN(expr, assumptions):
-        return True
+        return S(True)
 
 class TautologicalHandler(AskHandler):
     """Wrapper allowing to query the truth value of a boolean expression."""
 
     @staticmethod
     def bool(expr, assumptions):
+        return S(expr)
+
+    @staticmethod
+    def BooleanValue(expr, assumptions):
         return expr
 
     @staticmethod
@@ -56,32 +61,32 @@ class TautologicalHandler(AskHandler):
     @staticmethod
     def Not(expr, assumptions):
         value = ask(expr.args[0], assumptions=assumptions)
-        if value in (True, False):
-            return not value
+        if value in (S(True), S(False)):
+            return S(not value)
         else:
-            return None
+            return S(None)
 
 
     @staticmethod
     def Or(expr, assumptions):
-        result = False
+        result = S(False)
         for arg in expr.args:
             p = ask(arg, assumptions=assumptions)
-            if p == True:
-                return True
-            if p == None:
-                result = None
+            if p == S(True):
+                return S(True)
+            if p == S(None):
+                result = S(None)
         return result
 
     @staticmethod
     def And(expr, assumptions):
-        result = True
+        result = S(True)
         for arg in expr.args:
             p = ask(arg, assumptions=assumptions)
-            if p == False:
-                return False
-            if p == None:
-                result = None
+            if p == S(False):
+                return S(False)
+            if p == S(None):
+                result = S(None)
         return result
 
     @staticmethod
@@ -93,9 +98,11 @@ class TautologicalHandler(AskHandler):
     def Equivalent(expr, assumptions):
         p, q = expr.args
         pt = ask(p, assumptions=assumptions)
-        if pt == None:
-            return None
+        if pt == S(None):
+            return S(None)
         qt = ask(q, assumptions=assumptions)
-        if qt == None:
-            return None
-        return pt == qt
+        if qt == S(None):
+            return S(None)
+        if pt == qt:
+            return S(True)
+        return S(False)

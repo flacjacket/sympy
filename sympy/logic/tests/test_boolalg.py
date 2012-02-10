@@ -1,6 +1,6 @@
 from sympy.logic.boolalg import to_cnf, eliminate_implications, distribute_and_over_or, \
-    compile_rule, conjuncts, disjuncts, to_int_repr, fuzzy_not, Boolean, is_cnf
-from sympy import symbols, And, Or, Xor, Not, Nand, Nor, Implies, Equivalent, ITE
+    compile_rule, conjuncts, disjuncts, to_int_repr, Boolean, is_cnf
+from sympy import symbols, And, Or, Xor, Not, Nand, Nor, Implies, Equivalent, ITE, S
 from sympy.utilities.pytest import raises
 
 def test_overloading():
@@ -18,108 +18,108 @@ def test_overloading():
 def test_And():
     A, B, C = map(Boolean, symbols('A,B,C'))
 
-    assert And() == True
+    assert And() == S(True)
     assert And(A) == A
-    assert And(True) == True
-    assert And(False) == False
-    assert And(True,  True ) == True
-    assert And(True,  False) == False
-    assert And(False, False) == False
+    assert And(True) == S(True)
+    assert And(False) == S(False)
+    assert And(True,  True ) == S(True)
+    assert And(True,  False) == S(False)
+    assert And(False, False) == S(False)
     assert And(True,  A) == A
-    assert And(False, A) == False
-    assert And(True, True, True) == True
+    assert And(False, A) == S(False)
+    assert And(True, True, True) == S(True)
     assert And(True, True , A) == A
-    assert And(True, False, A) == False
+    assert And(True, False, A) == S(False)
 
 def test_Or():
     A, B, C = map(Boolean, symbols('A,B,C'))
 
-    assert Or() == False
+    assert Or() == S(False)
     assert Or(A) == A
-    assert Or(True) == True
-    assert Or(False) == False
-    assert Or(True,  True ) == True
-    assert Or(True,  False) == True
-    assert Or(False, False) == False
-    assert Or(True, A) == True
+    assert Or(True) == S(True)
+    assert Or(False) == S(False)
+    assert Or(True,  True ) == S(True)
+    assert Or(True,  False) == S(True)
+    assert Or(False, False) == S(False)
+    assert Or(True, A) == S(True)
     assert Or(False, A) == A
-    assert Or(True, False, False) == True
-    assert Or(True, False, A) == True
+    assert Or(True, False, False) == S(True)
+    assert Or(True, False, A) == S(True)
     assert Or(False, False, A) == A
 
 def test_Xor():
     A, B, C = map(Boolean, symbols('A,B,C'))
 
-    assert Xor() == False
+    assert Xor() == S(False)
     assert Xor(A) == A
-    assert Xor(True) == True
-    assert Xor(False) == False
-    assert Xor(True,  True ) == False
-    assert Xor(True,  False) == True
-    assert Xor(False, False) == False
+    assert Xor(True) == S(True)
+    assert Xor(False) == S(False)
+    assert Xor(True,  True ) == S(False)
+    assert Xor(True,  False) == S(True)
+    assert Xor(False, False) == S(False)
     assert Xor(True, A) == ~A
     assert Xor(False, A) == A
-    assert Xor(True, False, False) == True
+    assert Xor(True, False, False) == S(True)
     assert Xor(True, False, A) == ~A
     assert Xor(False, False, A) == A
 
 def test_Not():
-    assert Not(True) == False
-    assert Not(False) == True
-    assert Not(True, True ) == [False, False]
-    assert Not(True, False) == [False, True ]
-    assert Not(False,False) == [True,  True ]
+    assert Not(True) == S(False)
+    assert Not(False) == S(True)
+    assert Not(True, True ) == [S(False), S(False)]
+    assert Not(True, False) == [S(False), S(True) ]
+    assert Not(False,False) == [S(True),  S(True) ]
 
 def test_Nand():
     A, B, C = map(Boolean, symbols('A,B,C'))
 
-    assert Nand() == False
+    assert Nand() == S(False)
     assert Nand(A) == ~A
-    assert Nand(True) == False
-    assert Nand(False) == True
-    assert Nand(True,  True ) == False
-    assert Nand(True,  False) == True
-    assert Nand(False, False) == True
+    assert Nand(True) == S(False)
+    assert Nand(False) == S(True)
+    assert Nand(True,  True ) == S(False)
+    assert Nand(True,  False) == S(True)
+    assert Nand(False, False) == S(True)
     assert Nand(True,  A) == ~A
-    assert Nand(False, A) == True
-    assert Nand(True, True, True) == False
+    assert Nand(False, A) == S(True)
+    assert Nand(True, True, True) == S(False)
     assert Nand(True, True , A) == ~A
-    assert Nand(True, False, A) == True
+    assert Nand(True, False, A) == S(True)
 
 def test_Nor():
     A, B, C = map(Boolean, symbols('A,B,C'))
 
-    assert Nor() == True
+    assert Nor() == S(True)
     assert Nor(A) == ~A
-    assert Nor(True) == False
-    assert Nor(False) == True
-    assert Nor(True,  True ) == False
-    assert Nor(True,  False) == False
-    assert Nor(False, False) == True
-    assert Nor(True,  A) == False
+    assert Nor(True) == S(False)
+    assert Nor(False) == S(True)
+    assert Nor(True,  True ) == S(False)
+    assert Nor(True,  False) == S(False)
+    assert Nor(False, False) == S(True)
+    assert Nor(True,  A) == S(False)
     assert Nor(False, A) == ~A
-    assert Nor(True, True, True) == False
-    assert Nor(True, True , A) == False
-    assert Nor(True, False, A) == False
+    assert Nor(True, True, True) == S(False)
+    assert Nor(True, True , A) == S(False)
+    assert Nor(True, False, A) == S(False)
 
 def test_Implies():
     A, B, C = map(Boolean, symbols('A,B,C'))
 
     raises(ValueError, "Implies(A,B,C)")
-    assert Implies(True, True) == True
-    assert Implies(True, False) == False
-    assert Implies(False, True) == True
-    assert Implies(False, False) == True
+    assert Implies(True, True) == S(True)
+    assert Implies(True, False) == S(False)
+    assert Implies(False, True) == S(True)
+    assert Implies(False, False) == S(True)
     assert A >> B == B << A
 
 def test_Equivalent():
     A, B, C = map(Boolean, symbols('A,B,C'))
 
     assert Equivalent(A, B) == Equivalent(B, A) == Equivalent(A, B, A)
-    assert Equivalent() == True
-    assert Equivalent(A, A) == Equivalent(A) == True
-    assert Equivalent(True, True) == Equivalent(False, False) == True
-    assert Equivalent(True, False) == Equivalent(False, True) == False
+    assert Equivalent() == S(True)
+    assert Equivalent(A, A) == Equivalent(A) == S(True)
+    assert Equivalent(True, True) == Equivalent(False, False) == S(True)
+    assert Equivalent(True, False) == Equivalent(False, True) == S(False)
     assert Equivalent(A, True) == A
     assert Equivalent(A, False) == Not(A)
     assert Equivalent(A, B, True) == A & B
@@ -132,9 +132,9 @@ def test_bool_symbol():
 
     assert And(A, True)  == A
     assert And(A, True, True) == A
-    assert And(A, False) == False
-    assert And(A, True, False) == False
-    assert Or(A, True)   == True
+    assert And(A, False) == S(False)
+    assert And(A, True, False) == S(False)
+    assert Or(A, True)   == S(True)
     assert Or(A, False)  == A
 
 def test_subs():

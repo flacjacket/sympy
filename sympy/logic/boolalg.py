@@ -2,11 +2,14 @@
 from sympy.core.basic import Basic
 from sympy.core.operations import LatticeOp
 from sympy.core.function import Application, sympify
+from sympy.core.singleton import S, Singleton
 
 class Boolean(Basic):
     """A boolean object is an object for which logic operations make sense."""
 
     __slots__ = []
+
+    is_Boolean = True
 
     def __and__(self, other):
         """Overloading for & operator"""
@@ -31,13 +34,49 @@ class Boolean(Basic):
     def __xor__(self, other):
         return Xor(self, other)
 
+class BooleanValue(Boolean):
+    pass
+
+class BooleanTrue(BooleanValue):
+    __metaclass__ = Singleton
+
+    def __str__(self):
+        return 'True'
+    __repr__ = __str__
+
+    def __not__(self):
+        return S(False)
+
+class BooleanFalse(BooleanValue):
+    __metaclass__ = Singleton
+
+    def __str__(self):
+        return 'False'
+    __repr__ = __str__
+
+    def __not__(self):
+        return S(False)
+
+    def __nonzero__(self):
+        return False
+
+class BooleanNone(BooleanValue):
+    __metaclass__ = Singleton
+
+    def __str__(self):
+        return 'None'
+    __repr__ = __str__
+
+    def __not__(self):
+        return S(None)
+
+    def __nonzero__(self):
+        return False
 
 class BooleanFunction(Application, Boolean):
     """Boolean function is a function that lives in a boolean space
     It is used as base class for And, Or, Not, etc.
     """
-    is_Boolean = True
-
     def __call__(self, *args):
         return self.func(*[arg(*args) for arg in self.args])
 
@@ -56,8 +95,8 @@ class And(LatticeOp, BooleanFunction):
         >>> x & y
         And(x, y)
     """
-    zero = False
-    identity = True
+    zero = S.BooleanFalse
+    identity = S.BooleanTrue
 
 class Or(LatticeOp, BooleanFunction):
     """
@@ -66,8 +105,8 @@ class Or(LatticeOp, BooleanFunction):
     It evaluates its arguments in order, giving True immediately if any of them are
     True, and False if they are all False.
     """
-    zero = True
-    identity = False
+    zero = S.BooleanTrue
+    identity = S.BooleanFalse
 
 class Xor(BooleanFunction):
     """
@@ -147,7 +186,7 @@ class Not(BooleanFunction):
         if len(args) > 1:
             return map(cls, args)
         arg = args[0]
-        if type(arg) is bool:
+        if isinstance(arg, BooleanValue):
             return not arg
         # apply De Morgan Rules
         if arg.func is And:
@@ -245,7 +284,7 @@ class Implies(BooleanFunction):
             A, B = args
         except ValueError:
             raise ValueError("%d operand(s) used for an Implies (pairs are required): %s" % (len(args), str(args)))
-        if A is True or A is False or B is True or B is False:
+        if A is S(True) or A is S(False) or B is S(True) or B is S(False):
             return Or(Not(A), B)
         else:
             return Basic.__new__(cls, *args)
@@ -281,11 +320,11 @@ class Equivalent(BooleanFunction):
         argset = set(args)
         if len(argset) <= 1:
             return True
-        if True in argset:
-            argset.discard(True)
+        if S(True) in argset:
+            argset.discard(S(True))
             return And(*argset)
-        if False in argset:
-            argset.discard(False)
+        if S(False) in argset:
+            argset.discard(S(False))
             return Nor(*argset)
         return Basic.__new__(cls, *set(args))
 

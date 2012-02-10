@@ -200,8 +200,9 @@ class Set(Basic):
         return self.complement
 
     def __contains__(self, other):
+        from sympy.logic.boolalg import BooleanValue
         result = self.contains(other)
-        if not isinstance(result, bool):
+        if not (isinstance(result, bool) or isinstance(result, BooleanValue)):
             raise TypeError('contains did not evaluate to a bool: %r' % result)
         return result
 

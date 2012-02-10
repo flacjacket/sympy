@@ -1,4 +1,5 @@
 import inspect
+from sympy.core.singleton import S
 from sympy.utilities.source import get_class
 from sympy.logic.boolalg import Boolean
 
@@ -141,7 +142,7 @@ class Predicate(Boolean):
 
         This uses only direct resolution methods, not logical inference.
         """
-        res, _res = None, None
+        res, _res = S(None), S(None)
         mro = inspect.getmro(type(expr))
         for handler in self.handlers:
             cls = get_class(handler)
@@ -151,9 +152,9 @@ class Predicate(Boolean):
                 except AttributeError:
                     continue
                 res = eval(expr, assumptions)
-                if _res is None:
+                if _res is S(None):
                     _res = res
-                elif res is None:
+                elif res is S(None):
                     # since first resolutor was conclusive, we keep that value
                     res = _res
                 else:
