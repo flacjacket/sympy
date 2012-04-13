@@ -1,7 +1,7 @@
 from sympy.physics.quantum.secondquant import (
     B, Bd, CreateBoson, AnnihilateBoson, BosonicOperator, BBra, BKet,
     BosonState, F, Fd, CreateFermion, AnnihilateFermion, FBra, FKet,
-    FermionicOperator, FermionState
+    FermionicOperator, FermionState, NO
 )
 from sympy.physics.quantum import (
     Commutator, Dagger, InnerProduct, qapply
@@ -308,10 +308,10 @@ def test_symbolic_matrix_elements():
             KroneckerDelta(a,d)*NO(F(b)*Fd(c)) +
             NO(F(a)*F(b)*Fd(c)*Fd(d)))"""
 
-"""def test_NO():
+def test_NO():
     i,j,k,l = symbols('i j k l',below_fermi=True)
     a,b,c,d = symbols('a b c d',above_fermi=True)
-    p,q,r,s = symbols('p q r s', cls=Dummy)
+    p,q,r,s = symbols('p q r s')
 
     assert (NO(Fd(p)*F(q) + Fd(a)*F(b))==
        NO(Fd(p)*F(q)) + NO(Fd(a)*F(b)))
@@ -341,7 +341,7 @@ def test_symbolic_matrix_elements():
     l1 = [ ind for ind in no.iter_q_creators() ]
     assert l1 == [0,1]
     l2 = [ ind for ind in no.iter_q_annihilators() ]
-    assert l2 == [3,2]"""
+    assert l2 == [3,2]
 
 """def test_sorting():
     i,j = symbols('i,j',below_fermi=True)
