@@ -2,5 +2,5 @@
 Second Quantization
 ===================
 
-.. automodule:: sympy.physics.secondquant
+.. automodule:: sympy.physics.quantum.secondquant
    :members:

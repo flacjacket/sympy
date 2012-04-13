@@ -18,6 +18,7 @@ Quantum Functions
     constants.txt
     dagger.txt
     innerproduct.txt
+    secondquant.txt
     tensorproduct.txt
 
 States and Operators

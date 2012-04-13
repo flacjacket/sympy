@@ -18,7 +18,6 @@ Contents
     paulialgebra.txt
     qho_1d.txt
     sho.txt
-    secondquant.txt
     wigner.txt
     units.txt
     mechanics/index.txt
