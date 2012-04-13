@@ -10,8 +10,11 @@ from sympy.physics.quantum import (
 from sympy import expand, KroneckerDelta, sqrt, symbols
 from sympy.utilities.pytest import XFAIL
 
+h1, h2, h3 = symbols('h1 h2 h3',below_fermi=True)
+p1, p2, p3 = symbols('p1 p2 p3',above_fermi=True)
+n, m = symbols('n m')
+
 def test_dagger():
-    i, j, n, m = symbols('i,j,n,m')
     # Operators
     assert Dagger(B(0)) == Bd(0)
     assert Dagger(Bd(0)) == B(0)
@@ -28,16 +31,15 @@ def test_dagger():
     assert Dagger(FBra([n])) == FKet([n])
 
 def test_commutator():
-    n, m = symbols("n m", above_fermi=True)
     # Boson commutators
     assert Commutator(B(0), Bd(0)).doit() == 1
     assert Commutator(Bd(0), B(0)).doit() == -1
-    assert Commutator(B(n), Bd(m)).doit() == KroneckerDelta(n, m)
-    assert Commutator(Bd(n), B(m)).doit() == -KroneckerDelta(n, m)
+    assert Commutator(B(p1), Bd(p2)).doit() == KroneckerDelta(p1, p2)
+    assert Commutator(Bd(p2), B(p1)).doit() == -KroneckerDelta(p1, p2)
     assert Commutator(B(0), B(1)).doit() == 0
     assert Commutator(Bd(0), Bd(1)).doit() == 0
-    assert Commutator(B(n), B(m)).doit() == 0
-    assert Commutator(Bd(n), Bd(m)).doit() == 0
+    assert Commutator(B(p1), B(p2)).doit() == 0
+    assert Commutator(Bd(p1), Bd(p2)).doit() == 0
     # Fermion commutator
     """c = Commutator(F(m), Fd(m))
     assert c == +1 - 2*NO(Fd(m)*F(m))
@@ -60,24 +62,19 @@ def test_commutator():
     assert C(Fd(a)*F(i),Fd(b)*F(j)).doit(wicks=True) == 0"""
 
 def test_boson_operators():
-    n, m = symbols('n m')
     # Creation operators
-    o = Bd(0)
-    assert isinstance(o, CreateBoson)
-    assert qapply(o * BKet([0])) == BKet([1])
-    assert qapply(o * BKet([n])) == sqrt(n+1) * BKet([n+1])
-    o = Bd(n)
-    assert qapply(o * BKet([0])) == o * BKet([0])
-    assert qapply(o * BKet([n])) == o * BKet([n])
+    assert isinstance(Bd(0), CreateBoson)
+    assert qapply(Bd(0) * BKet([0])) == BKet([1])
+    assert qapply(Bd(0) * BKet([n])) == sqrt(n+1) * BKet([n+1])
+    assert qapply(Bd(n) * BKet([0])) == Bd(n) * BKet([0])
+    assert qapply(Bd(n) * BKet([n])) == Bd(n) * BKet([n])
     # Annihilation operators
-    o = B(0)
-    assert isinstance(o, AnnihilateBoson)
-    assert qapply(o * BKet([0])) == 0
-    assert qapply(o * BKet([1])) == BKet([0])
-    assert qapply(o * BKet([n])) == sqrt(n)*BKet([n-1])
-    o = B(n)
-    assert qapply(o * BKet([0])) == o * BKet([0])
-    assert qapply(o * BKet([n])) == o*BKet([n])
+    assert isinstance(B(0), AnnihilateBoson)
+    assert qapply(B(0) * BKet([0])) == 0
+    assert qapply(B(0) * BKet([1])) == BKet([0])
+    assert qapply(B(0) * BKet([n])) == sqrt(n) * BKet([n-1])
+    assert qapply(B(n) * BKet([0])) == B(n) * BKet([0])
+    assert qapply(B(n) * BKet([n])) == B(n) * BKet([n])
     # Complex boson operators
     o = Bd(0) * B(0) * Bd(1) * B(0)
     e = qapply(o * BKet([n, m]))
@@ -86,37 +83,51 @@ def test_boson_operators():
 
 def test_fermion_operators():
     # Creation operators
-    """o = Fd(1)
-    assert isinstance(o, CreateFermion)
-    assert o.apply_operator(FKet([n])) == FKet([1,n])
-    assert o.apply_operator(FKet([n])) ==-FKet([n,1])
-    o = Fd(n)
-    assert o.apply_operator(FKet([])) == FKet([n])
-
-    vacuum = FKet([],fermi_level=4)
-    assert vacuum == FKet([],fermi_level=4)
-
-    i,j,k,l = symbols('i,j,k,l',below_fermi=True)
-    a,b,c,d = symbols('a,b,c,d',above_fermi=True)
-    p,q,r,s = symbols('p,q,r,s')
-
-    assert Fd(i).apply_operator(FKet([i,j,k],4)) == FKet([j,k],4)
-    assert Fd(a).apply_operator(FKet([i,b,k],4)) == FKet([a,i,b,k],4)"""
+    assert isinstance(Fd(1), CreateFermion)
+    assert qapply(Fd(1) * FKet([n])) == FKet([1, n])
+    assert qapply(Fd(1) * FKet([n])) == -FKet([n, 1])
+    assert qapply(Fd(n) * FKet([])) == FKet([n])
+    assert qapply(Fd(p1) * FKet([])) == FKet([p1])
+    assert qapply(Fd(h1) * FKet([])) == 0
+    assert qapply(Fd(h1) * FKet([h1, h2], 4)) == FKet([h2], 4)
+    assert qapply(Fd(h2) * FKet([h1, h2], 4)) == -FKet([h1], 4)
+    assert qapply(Fd(h3) * FKet([h1, h2], 4)) == 0
+    assert qapply(Fd(p1) * FKet([h1, h2, h3], 4)) == FKet([p1, h1, h2, h3], 4)
     # Annihilation operators
-    """o = F(1)
-    assert isinstance(o, AnnihilateFermion)
-    assert o.apply_operator(FKet([1,n])) == FKet([n])
-    assert o.apply_operator(FKet([n,1])) ==-FKet([n])
-    o = F(n)
-    assert o.apply_operator(FKet([n])) == FKet([])
+    assert isinstance(F(1), AnnihilateFermion)
+    assert qapply(F(1) * FKet([1, n])) == FKet([n])
+    assert qapply(F(1) * FKet([n, 1])) == -FKet([n])
+    assert qapply(F(n) * FKet([n])) == FKet([])
+    assert qapply(F(h1) * FKet([h1, h2, h3], 4)) == 0
+    assert qapply(F(h1) * FKet([h2, h3], 4)) == FKet([h1, h2, h3], 4)
+    assert qapply(F(h1) * FKet([h2, h3], 2)) == 0
+    assert qapply(F(p1) * FKet([h1, p2, h2], 4)) == 0
+    assert qapply(F(p3) * FKet([p1, p2], 4)) == 0
+    assert qapply(F(p1) * FKet([p1, p2], 4)) == FKet([p2], 4)
 
-    i,j,k,l = symbols('i,j,k,l',below_fermi=True)
-    a,b,c,d = symbols('a,b,c,d',above_fermi=True)
-    p,q,r,s = symbols('p,q,r,s')
-    assert F(i).apply_operator(FKet([i,j,k],4)) == 0
-    assert F(a).apply_operator(FKet([i,b,k],4)) == 0
-    assert F(l).apply_operator(FKet([i,j,k],3)) == 0
-    assert F(l).apply_operator(FKet([i,j,k],4)) == FKet([l,i,j,k],4)"""
+def test_fermi_level():
+    assert F(p1).is_below_fermi is False
+    assert F(h1).is_below_fermi
+    assert F(n).is_below_fermi is None
+    assert F(p1).is_above_fermi
+    assert F(h1).is_above_fermi is False
+    assert F(n).is_above_fermi is None
+
+def test_q_particle():
+    # Create quasiparticle
+    assert F(p1).q_creator == 0
+    assert Fd(p1).q_creator == 1
+    assert F(h1).q_creator == -1
+    assert Fd(h1).q_creator == 0
+    assert F(n).q_creator == -1
+    assert Fd(n).q_creator == 1
+    # Annihilate quasiparticles
+    assert F(p1).q_annihilator == 1
+    assert Fd(p1).q_annihilator == 0
+    assert F(h1).q_annihilator == 0
+    assert Fd(h1).q_annihilator == -1
+    assert F(n).q_annihilator == 1
+    assert Fd(n).q_annihilator == -1
 
 def test_number_operator():
     n = symbols("n")

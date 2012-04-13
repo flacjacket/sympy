@@ -4,7 +4,7 @@ Second quantization operators and states for bosons.
 This follow the formulation of Fetter and Welecka, "Quantum Theory of
 Many-Particle Systems."
 """
-from sympy import Dummy, Expr, S, sqrt, sympify
+from sympy import Dummy, Expr, Mul, S, sqrt, sympify
 from sympy.printing.pretty.stringpict import prettyForm
 from sympy.functions.special.tensor_functions import KroneckerDelta
 from sympy.physics.quantum import Bra, FockSpace, Ket, Operator, State
@@ -22,6 +22,16 @@ __all__ = [
     'contraction',
     'wicks'
 ]
+
+#-----------------------------------------------------------------------------
+# Second Quant Exceptions
+#-----------------------------------------------------------------------------
+
+class SecondQuantizationError(Exception):
+    pass
+
+class ViolationOfPauliPrinciple(Exception):
+    pass
 
 #-----------------------------------------------------------------------------
 # Second Quantization Operators
@@ -109,7 +119,7 @@ class BosonicOperator(object):
 
     def _apply_operator_FockStateBosonKet(self, ket, **options):
         if not self.is_symbolic:
-            return self._apply_sqop(ket, **options)
+            return self._apply_boson(ket, **options)
 
 class FermionicOperator(object):
     """Base class for fermion operators."""
@@ -117,18 +127,74 @@ class FermionicOperator(object):
     op_label = 'a'
 
     def _apply_operator_FockStateFermionKet(self, ket, **options):
-        if not self.is_symbolic:
-            return self._apply_sqop(ket, **options)
+        return self._apply_fermion(ket, **options)
+
+    @property
+    def is_above_fermi(self):
+        """Does this operator allow values above the fermi level
+
+        Examples
+        ========
+
+        >>> from sympy import symbols
+        >>> from sympy.physics.secondquant import F
+        >>> p = symbols('p', above_fermi=True)
+        >>> h = symbols('h', below_fermi=True)
+        >>> n = symbols('n')
+
+        >>> F(p).is_above_fermi
+        True
+        >>> F(h).is_above_fermi
+        False
+        >>> F(n).is_above_fermi #doctest: +SKIP
+
+        """
+        bf = self.state.assumptions0.get('below_fermi')
+        af = self.state.assumptions0.get('above_fermi')
+        if af:
+            return True
+        if bf:
+            return False
+
+    @property
+    def is_below_fermi(self):
+        """Does this operator allow values above the fermi level
+
+        Examples
+        ========
+
+        >>> from sympy import symbols
+        >>> from sympy.physics.secondquant import F
+        >>> p = symbols('p', above_fermi=True)
+        >>> h = symbols('h', below_fermi=True)
+        >>> n = symbols('n')
+
+        >>> F(p).is_below_fermi
+        False
+        >>> F(h).is_below_fermi
+        True
+        >>> F(n).is_below_fermi #doctest: +SKIP
+
+        """
+        bf = self.state.assumptions0.get('below_fermi')
+        af = self.state.assumptions0.get('above_fermi')
+        if af:
+            return False
+        if bf:
+            return True
 
 class AnnihilatorOpBase(SecondQuantOpBase):
     """Base class for annihilation operators."""
 
-    def _apply_sqop(self, ket, **options):
+    def _apply_boson(self, ket, **options):
         state = self.state
         if len(ket) <= state:
             return S.Zero
         a = sqrt(ket.occupation[state])
         return a * ket.down(state)
+
+    def _apply_fermion(self, ket, **options):
+        return ket.down(self.state)
 
 class CreatorOpBase(SecondQuantOpBase):
     """Base class for creation operators."""
@@ -137,13 +203,16 @@ class CreatorOpBase(SecondQuantOpBase):
     op_udecorator = u'\u2020'
     op_latexdecorator = r'\dag'
 
-    def _apply_sqop(self, ket, **options):
+    def _apply_boson(self, ket, **options):
         state = self.state
         if len(ket) <= state:
             a = 1
         else:
             a = sqrt(ket.occupation[state]+1)
         return a * ket.up(state)
+
+    def _apply_fermion(self, ket, **options):
+        return ket.up(self.state)
 
 class AnnihilateBoson(BosonicOperator, AnnihilatorOpBase):
     """Operator for annihilating boson states.
@@ -188,6 +257,60 @@ class AnnihilateFermion(FermionicOperator, AnnihilatorOpBase):
     def _eval_dagger(self):
         return CreateFermion(self.state)
 
+    @property
+    def q_creator(self):
+        """Does the operator create a quasi-particle
+
+        Will return -1 if the annihilator can act below the fermi level (i.e.
+        creating a hole).
+
+        Examples
+        ========
+
+        >>> from sympy import symbols
+        >>> from sympy.physics.quantum.secondquant import F
+        >>> p = symbols('p', above_fermi=True)
+        >>> h = symbols('h', below_fermi=True)
+        >>> n = symbols('n')
+        >>> F(p).q_creator
+        0
+        >>> F(h).q_creator
+        -1
+        >>> F(n).q_creator
+        -1
+
+        """
+        if self.is_below_fermi is not False:
+            return -1
+        return 0
+
+    @property
+    def q_annihilator(self):
+        """Does the operator destroy a quasi-particle
+
+        Will return 1 if the annihilator can act above the fermi level (i.e.
+        destroying a particle).
+
+        Examples
+        ========
+
+        >>> from sympy import symbols
+        >>> from sympy.physics.quantum.secondquant import F
+        >>> p = symbols('p', above_fermi=True)
+        >>> h = symbols('h', below_fermi=True)
+        >>> n = symbols('n')
+        >>> F(p).q_annihilator
+        1
+        >>> F(h).q_annihilator
+        0
+        >>> F(n).q_annihilator
+        1
+
+        """
+        if self.is_above_fermi is not False:
+            return 1
+        return 0
+
 class CreateFermion(FermionicOperator, CreatorOpBase):
     """Operator for annihilating fermion states."""
 
@@ -196,6 +319,60 @@ class CreateFermion(FermionicOperator, CreatorOpBase):
 
     def _eval_dagger(self):
         return AnnihilateFermion(self.state)
+
+    @property
+    def q_creator(self):
+        """Does the operator create a quasi-particle
+
+        Will return 1 if the creator can act above the fermi level (i.e.
+        creating a particle).
+
+        Examples
+        ========
+
+        >>> from sympy import symbols
+        >>> from sympy.physics.quantum.secondquant import Fd
+        >>> p = symbols('p', above_fermi=True)
+        >>> h = symbols('h', below_fermi=True)
+        >>> n = symbols('n')
+        >>> Fd(p).q_creator
+        1
+        >>> Fd(h).q_creator
+        0
+        >>> Fd(n).q_creator
+        1
+
+        """
+        if self.is_above_fermi is not False:
+            return 1
+        return 0
+
+    @property
+    def q_annihilator(self):
+        """Does the operator destroy a quasi-particle
+
+        Will return -1 if the creator can act below the fermi level (i.e.
+        creating a hole).
+
+        Examples
+        ========
+
+        >>> from sympy import symbols
+        >>> from sympy.physics.quantum.secondquant import Fd
+        >>> p = symbols('p', above_fermi=True)
+        >>> h = symbols('h', below_fermi=True)
+        >>> n = symbols('n')
+        >>> Fd(p).q_annihilator
+        0
+        >>> Fd(h).q_annihilator
+        -1
+        >>> Fd(n).q_annihilator
+        -1
+
+        """
+        if self.is_below_fermi is not False:
+            return -1
+        return 0
 
 B = AnnihilateBoson
 Bd = CreateBoson
@@ -289,20 +466,6 @@ class BosonState(FockState):
         occ[state] -= 1
         return self.__class__(occ)
 
-def _fermion_key(state):
-    h = hash(state)
-    if index.assumptions0.get('above_fermi'):
-        i = 0
-    elif index.assumptions0.get('below_fermi'):
-        i = 1
-    else:
-        i = 2
-
-    if isinstance(index, Dummy):
-        i += 10
-
-    return i, h
-
 class FermionState(FockState):
     """Base class for fermionic Fock state."""
 
@@ -310,11 +473,16 @@ class FermionState(FockState):
         occupation = map(sympify, occupation)
         if len(occupation) > 1:
             try:
-                occupation, sign = cls._sort_occupation(occupations)
+                occupation, sign = _sort_anticommuting(occupation, key=cls._sort_key)
             except ViolationOfPauliPrinciple:
                 return S.Zero
+            sign = (S.NegativeOne)**sign
         else:
             sign = 1
+
+        holes = cls._count_holes(occupation, fermi_level)
+        if holes > fermi_level:
+            return S.Zero
 
         return sign * FockState.__new__(cls, occupation, fermi_level)
 
@@ -323,29 +491,23 @@ class FermionState(FockState):
         return self.args[1]
 
     @classmethod
-    def _sort_occupation(cls, occupation, key=_fermion_key):
-        verified = False
-        sign = 1
-        end = len(occupation) - 1
-        rev = range(len(occupation)-3, -1, -1)
+    def _sort_key(cls, state):
+        # Fermion sort key for occupations
+        h = hash(state)
+        if state.assumptions0.get('above_fermi'):
+            i = 0
+        elif state.assumptions0.get('below_fermi'):
+            i = 1
+        else:
+            i = 2
+        if isinstance(state, Dummy):
+            i += 10
+        return i, h
 
-        keys = list(map(key, occupation))
-        key_to_state = dict(zip(keys, occupation))
-
-        while not verified:
-            verified = True
-            for i in range(end):
-                l = keys[i]
-                r = keys[i+1]
-                if l == r:
-                    raise ViolationOfPauliPrinciple([l, r])
-                if l > r:
-                    verified = False
-                    keys[i:i+2] = [r, l]
-                    sign *= -1
-            end -= 1
-        occupation = [ key_to_state[k] for k in keys ]
-        return occupation, sign
+    @classmethod
+    def _count_holes(cls, occupation, fermi_level):
+        """ Counts the number of excitations that are considered holes."""
+        return len([i for i in occupation if cls._only_below_fermi(i, fermi_level)])
 
     def _eval_innerproduct_FockStateBosonBra(self, bra, **hints):
         occ_bra = bra.occupation
@@ -400,14 +562,14 @@ class FermionState(FockState):
         """
         present = state in self.occupation
 
-        if self._only_below_fermi(state):
+        if self._only_below_fermi(state, self.fermi_level):
             if present:
                 # Create hole excitation
                 return self._remove_orbit(state)
             else:
                 # No hole, so excitation still present below fermi level
                 return S.Zero
-        elif self._only_above_fermi(state):
+        elif self._only_above_fermi(state, self.fermi_level):
             if present:
                 # Particle excitation already exsits above fermi level
                 return S.Zero
@@ -469,12 +631,12 @@ class FermionState(FockState):
         """
         present = state in self.occupation
 
-        if self._only_above_fermi(state):
+        if self._only_above_fermi(state, self.fermi_level):
             if present:
-                return ket._remove_orbit(i)
+                return self._remove_orbit(state)
             else:
                 return S.Zero
-        elif self._only_below_fermi(state):
+        elif self._only_below_fermi(state, self.fermi_level):
             if present:
                 return S.Zero
             else:
@@ -483,7 +645,7 @@ class FermionState(FockState):
             if present:
                 hole = Dummy("i", below_fermi=True)
                 d = KroneckerDelta(state, hole)
-                s = ket._remove_orbit(state)
+                s = self._remove_orbit(state)
             else:
                 particle = Dummy("a", above_fermi=True)
                 d = KroneckerDelta(state, particle)
@@ -503,19 +665,21 @@ class FermionState(FockState):
     def _add_orbit(self, state):
         return self.__class__((state,) + self.occupation, self.fermi_level)
 
-    def _only_below_fermi(self, state):
+    @classmethod
+    def _only_below_fermi(cls, state, fermi_level):
         if state.is_number:
-            return state <= self.fermi_level
+            return state <= fermi_level
         if state.assumptions0.get('below_fermi'):
             return True
         return False
 
-    def _only_above_fermi(self, state):
+    @classmethod
+    def _only_above_fermi(cls, state, fermi_level):
         if state.is_number:
-            return i > self.fermi_level
+            return state > fermi_level
         if state.assumptions0.get('above_fermi'):
             return True
-        return self.fermi_level == 0
+        return fermi_level == 0
 
 class FockStateBosonKet(BosonState, Ket):
     """Many particle boson state."""
@@ -547,8 +711,106 @@ FBra = FockStateFermionBra
 FKet = FockStateFermionKet
 
 class NO(Expr):
-    # TODO
-    pass
+    # TODO Allow NO to take boson operators
+    """Normal ordering function of given operators
+
+    Represents the normal ordering of a product of operators. A normal ordered
+    product of operators has all the creation operators on the left and all the
+    annihilation operators on the right.
+
+    The normal ordering implementation currently assumes all operators
+    anticummute and have vanishing contractions. This allows immediate
+    reordering to canonical form.
+
+    Examples
+    ========
+
+    >>> from sympy.abc import p, q
+    >>> from sympy.physics.quantum.secondquant import NO, F, Fd
+    >>> NO(Fd(p) * F(q))
+    NO(a+(p)*a(q))
+    >>> NO(F(q) * Fd(p))
+    -NO(a+(p)*a(q))
+
+    See Also
+    ========
+
+    wicks: Generate normal ordered equivalent of an expression
+
+    """
+
+    nargs = 1
+    is_commutative = False
+
+    def __new__(cls, arg):
+        arg = sympify(arg).expand()
+        # {ab + cd} = {ab} + {cd}
+        if arg.is_Add:
+            return Add(*[ cls(term) for term in arg.args])
+        if arg.is_Mul:
+            c_part, nc_part = arg.args_cnc()
+            if c_part:
+                coeff = Mul(*c_part)
+            else:
+                coeff = S.One
+            if not nc_part:
+                return coeff
+
+            # {ab{cd}} = {abcd}
+            if [arg for arg in nc_part if isinstance(arg, NO)]:
+                new_args = []
+                for arg in nc_part:
+                    if isinstance(arg, NO):
+                        new_args.extend(arg.args)
+                    else:
+                        new_args.append(arg)
+                return coeff * cls(Mul(*new_args))
+
+            try:
+                new_args, sign = _sort_anticommuting(nc_part)
+            except ViolationOfPauliPrinciple:
+                return S.Zero
+
+            if sign:
+                sign = S.NegativeOne**sign
+                return sign * coeff * cls(Mul(*new_args))
+
+            # Since sign == 0 didn't need reordering
+            if coeff != S.One:
+                return coeff * cls(Mul(*nc_part))
+            return Expr.__new__(cls, Mul(*nc_part))
+
+        if isinstance(arg, NO):
+            return arg
+
+        # if object was not Mul or Add, normal ordering does not apply
+        return arg
+
+    def has_q_creators(self):
+        """Does the normal ordering have quasiparticle creators
+
+        Return 0 if the leftmost argument of the first argument does not create
+        a quasiparticle, else 1 if it is above fermi (particle) or -1 if it is
+        below fermi (hole).
+
+        Examples
+        ========
+
+        >>> from sympy import symbols
+        >>> from sympy.physics.quantum.quantem.secondquant import NO, F, Fd
+        >>> p = symbols('p', above_fermi=True)
+        >>> h = symbols('h', below_fermi=True)
+
+        >>> NO(Fd(p) * Fd(h)).has_q_creators
+        1
+        >>> NO(F(p) * F(h)).has_q_creators
+        -1
+        >>> NO(Fd(p) * F(h)).has_q_creators
+        0
+
+        """
+        return self.args[0].args[0].is_q_creator
+
 
 def contraction(a, b):
     # TODO
@@ -557,3 +819,40 @@ def contraction(a, b):
 def wicks(e, **kw_args):
     # TODO
     pass
+
+def _fermionic_key(state):
+    # Sort key for fermionic operators
+    h = hash(state)
+    label = str(state.label)
+
+    if state.q_creator:
+        return 1, label, h
+    if state.q_annihilator:
+        return 4, label, h
+    if isinstance(state, AnnihilatorOpBase):
+        return 3, label, h
+    if isinstance(state, CreatorOpBase):
+        return 2, label, h
+
+def _sort_anticommuting(occupation, key=_fermionic_key):
+    verified = False
+    sign = 0
+    end = len(occupation) - 1
+
+    keys = list(map(key, occupation))
+    key_to_state = dict(zip(keys, occupation))
+
+    while not verified:
+        verified = True
+        for i in range(end):
+            l = keys[i]
+            r = keys[i+1]
+            if l == r:
+                raise ViolationOfPauliPrinciple([l, r])
+            if l > r:
+                verified = False
+                keys[i:i+2] = [r, l]
+                sign += 1
+        end -= 1
+    occupation = [ key_to_state[k] for k in keys ]
+    return occupation, sign
