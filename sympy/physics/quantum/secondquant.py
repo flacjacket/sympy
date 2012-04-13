@@ -30,7 +30,13 @@ __all__ = [
 class SecondQuantizationError(Exception):
     pass
 
-class ViolationOfPauliPrinciple(Exception):
+class ContractionAppliesOnlyToFermions(SecondQuantizationError):
+    pass
+
+class SubstitutionOfAmbiguousOperatorFailed(SecondQuantizationError):
+    pass
+
+class ViolationOfPauliPrinciple(SecondQuantizationError):
     pass
 
 #-----------------------------------------------------------------------------
@@ -89,6 +95,9 @@ class SecondQuantOpBase(Operator):
         """
         return self.label[0]
 
+    def doit(self):
+        return self
+
     def _sympystr(self, printer, *args):
         if self.op_decorator:
             op = "%s%s" % (self.op_label, self.op_decorator)
@@ -128,6 +137,17 @@ class FermionicOperator(object):
 
     def _apply_operator_FockStateFermionKet(self, ket, **options):
         return self._apply_fermion(ket, **options)
+
+    def _eval_commutator_AnnihilateFermion(self, other, **hints):
+        return self._eval_commutator_FermionicOperator(other, **hints)
+
+    def _eval_commutator_CreateFermion(self, other, **hints):
+        return self._eval_commutator_FermionicOperator(other, **hints)
+
+    def _eval_commutator_FermionicOperator(self, other, **hints):
+        a = self
+        b = other
+        return wicks(self * other) - wicks(other * self)
 
     @property
     def is_above_fermi(self):
@@ -251,12 +271,6 @@ class CreateBoson(BosonicOperator, CreatorOpBase):
 class AnnihilateFermion(FermionicOperator, AnnihilatorOpBase):
     """Operator for annihilating fermion states."""
 
-    def _eval_commutator_FermionicOpBase(self, other):
-        return wicks(self * other) - wicks(other * self)
-
-    def _eval_dagger(self):
-        return CreateFermion(self.state)
-
     def _apply_contraction(self, other):
         if not isinstance(other, FermionicOperator):
             raise NotImplementedError
@@ -268,6 +282,9 @@ class AnnihilateFermion(FermionicOperator, AnnihilatorOpBase):
             return KroneckerDelta(self.state, other.state) * \
                     KroneckerDelta(other.state, Dummy('p', above_fermi=True))
         return S.Zero
+
+    def _eval_dagger(self):
+        return CreateFermion(self.state)
 
     @property
     def q_creator(self):
@@ -326,12 +343,6 @@ class AnnihilateFermion(FermionicOperator, AnnihilatorOpBase):
 class CreateFermion(FermionicOperator, CreatorOpBase):
     """Operator for annihilating fermion states."""
 
-    def _eval_commutator_FermionicOpBase(self, other):
-        return wicks(self * other) - wicks(other * self)
-
-    def _eval_dagger(self):
-        return AnnihilateFermion(self.state)
-
     def _apply_contraction(self, other):
         if not isinstance(other, FermionicOperator):
             raise NotImplementedError
@@ -343,6 +354,9 @@ class CreateFermion(FermionicOperator, CreatorOpBase):
             return KroneckerDelta(self.state, other.state) * \
                     KroneckerDelta(other.state, Dummy('p', above_fermi=True))
         return S.Zero
+
+    def _eval_dagger(self):
+        return AnnihilateFermion(self.state)
 
     @property
     def q_creator(self):
@@ -443,9 +457,6 @@ class BosonState(FockState):
             if result == 0:
                 break
         return result
-
-    #def _represent_VarBosonicBasis(self, basis, **options):
-    #    return
 
     def up(self, state):
         """Creates a particle at a given state.
@@ -635,7 +646,8 @@ class FermionState(FockState):
         >>> FKet([]).down(a)
         0
 
-        An annihilator acting below the fermi level will not vanish, provided the fermi level is greater than 0:
+        An annihilator acting below the fermi level will not vanish, provided
+        the fermi level is greater than 0:
 
         >>> i = symbols('i', below_fermi=True)
         >>> FKet([]).down(i)
@@ -862,6 +874,31 @@ class NO(Expr):
         """
         return self.args[0].args[-1].q_annihilator
 
+    def doit(self, **kw_args):
+        """
+        Either removes the brackets or enables complex computations
+        in its arguments.
+
+        Examples
+        ========
+
+        >>> from sympy.physics.secondquant import NO, Fd, F
+        >>> from textwrap import fill
+        >>> from sympy import symbols, Dummy
+        >>> p,q = symbols('p,q', cls=Dummy)
+        >>> print fill(str(NO(Fd(p)*F(q)).doit()))
+        KroneckerDelta(_a, _p)*KroneckerDelta(_a,
+        _q)*CreateFermion(_a)*AnnihilateFermion(_a) + KroneckerDelta(_a,
+        _p)*KroneckerDelta(_i, _q)*CreateFermion(_a)*AnnihilateFermion(_i) -
+        KroneckerDelta(_a, _q)*KroneckerDelta(_i,
+        _p)*AnnihilateFermion(_a)*CreateFermion(_i) - KroneckerDelta(_i,
+        _p)*KroneckerDelta(_i, _q)*AnnihilateFermion(_i)*CreateFermion(_i)
+        """
+        if kw_args.get("remove_brackets", False):
+            return self._remove_brackets()
+        else:
+            return self.__new__(type(self),self.args[0].doit(**kw_args))
+
     def _remove_brackets(self):
         """Returns sorted expression without normal order brackets
 
@@ -869,7 +906,97 @@ class NO(Expr):
         exist.
         """
         # check if any creator is also an annihilator
-        pass
+        subslist=[]
+        c_and_a = [arg for arg in self.args[0].args
+                if arg.q_creator and arg.q_annihilator]
+        for op in c_and_a:
+            assume = op.state.assumptions0
+
+            # only operators with a dummy index can be split in two terms
+            if isinstance(op.state, Dummy):
+
+                # create indices with fermi restriction
+                assume.pop("above_fermi", None)
+                assume["below_fermi"]=True
+                below = Dummy('i', **assume)
+                assume.pop("below_fermi", None)
+                assume["above_fermi"]=True
+                above = Dummy('a', **assume)
+
+                cls = type(op)
+                split = (
+                        op.__new__(cls,below)
+                        * KroneckerDelta(below,op.state)
+                        + op.__new__(cls,above)
+                        * KroneckerDelta(above,op.state)
+                        )
+                subslist.append((op,split))
+            else:
+                raise SubstitutionOfAmbiguousOperatorFailed(op)
+        if subslist:
+            result = NO(self.subs(subslist))
+            if isinstance(result, Add):
+                return Add(*[term.doit() for term in result.args])
+        else:
+            return self.args[0]
+
+    def _expand_operators(self):
+        """
+        Returns a sum of NO objects that contain no ambiguous q-operators.
+
+        If an index q has range both above and below fermi, the operator F(q)
+        is ambiguous in the sense that it can be both a q-creator and a q-annihilator.
+        If q is dummy, it is assumed to be a summation variable and this method
+        rewrites it into a sum of NO terms with unambiguous operators:
+
+        {Fd(p)*F(q)} = {Fd(a)*F(b)} + {Fd(a)*F(i)} + {Fd(j)*F(b)} -{F(i)*Fd(j)}
+
+        where a,b are above and i,j are below fermi level.
+        """
+        return NO(self._remove_brackets)
+
+    def __getitem__(self,i):
+        if isinstance(i,slice):
+            indices = i.indices(len(self))
+            return [self.args[0].args[i] for i in range(*indices)]
+        else:
+            return self.args[0].args[i]
+
+    def __len__(self):
+        return len(self.args[0].args)
+
+    def get_subNO(self, i):
+        """
+        Returns a NO() without FermionicOperator at index i.
+
+        Examples
+        ========
+
+        >>> from sympy import symbols
+        >>> from sympy.physics.secondquant import F, NO
+        >>> p,q,r = symbols('p,q,r')
+
+        >>> NO(F(p)*F(q)*F(r)).get_subNO(1)  # doctest: +SKIP
+        NO(AnnihilateFermion(p)*AnnihilateFermion(r))
+
+        """
+        arg0 = self.args[0] # it's a Mul by definition of how it's created
+        mul = arg0._new_rawargs(arg0.args[:i] + arg0.args[i + 1:])
+        return NO(mul)
+
+    def _sympystr(self, printer, *args):
+        return ":%s:" % printer._print(self.args[0])
+
+    def _pretty(self, printer, *args):
+        dots = printer._print(':')
+        args = printer._print(self.args[0])
+        pform = prettyForm(*dots.right(args))
+        pform = prettyForm(*pform.right(dots))
+        return pform
+
+    def _latex(self,printer):
+        return r":%s:" % printer._print(self.args[0])
+    
 
 def contraction(a, b):
     """
@@ -908,12 +1035,108 @@ def contraction(a, b):
     0
 
     """
+    if isinstance(b,FermionicOperator) and isinstance(a,FermionicOperator):
+        if isinstance(a,AnnihilateFermion) and isinstance(b,CreateFermion):
+            if b.state.assumptions0.get("below_fermi"):
+                return S.Zero
+            if a.state.assumptions0.get("below_fermi"):
+                return S.Zero
+            if b.state.assumptions0.get("above_fermi"):
+                return KroneckerDelta(a.state,b.state)
+            if a.state.assumptions0.get("above_fermi"):
+                return KroneckerDelta(a.state,b.state)
+
+            return (KroneckerDelta(a.state,b.state)*
+                    KroneckerDelta(b.state,Dummy('a', above_fermi=True)))
+        if isinstance(b,AnnihilateFermion) and isinstance(a,CreateFermion):
+            if b.state.assumptions0.get("above_fermi"):
+                return S.Zero
+            if a.state.assumptions0.get("above_fermi"):
+                return S.Zero
+            if b.state.assumptions0.get("below_fermi"):
+                return KroneckerDelta(a.state,b.state)
+            if a.state.assumptions0.get("below_fermi"):
+                return KroneckerDelta(a.state,b.state)
+
+            return (KroneckerDelta(a.state,b.state)*
+                    KroneckerDelta(b.state,Dummy('i', below_fermi=True)))
+
+        # vanish if 2xAnnihilator or 2xCreator
+        return S.Zero
+
+    else:
+        #not fermion operators
+        t = ( isinstance(i,FermionicOperator) for i in (a,b) )
+        raise ContractionAppliesOnlyToFermions(*t)
+
     try:
         r = a._apply_contraction(b)
     except NotImplementedError:
-        t = ( isinstance(i,FermionicOperator) for i in (a,b) )
-        raise ContractionAppliesOnlyToFermions(*t)
+        raise ContractionAppliesOnlyToFermions(a,b)
     return r
+
+#@cacheit
+def _get_contractions(string1, keep_only_fully_contracted=False):
+    """
+    Returns Add-object with contracted terms.
+
+    Uses recursion to find all contractions. -- Internal helper function --
+
+    Will find nonzero contractions in string1 between indices given in
+    leftrange and rightrange.
+
+    """
+
+    # Should we store current level of contraction?
+    if keep_only_fully_contracted and string1:
+        result = []
+    else:
+        result = [NO(Mul(*string1))]
+
+    for i in range(len(string1)-1):
+        for j in range(i+1,len(string1)):
+
+            c = contraction(string1[i],string1[j])
+
+            if c:
+                # print "found contraction",c
+
+                sign = (j-i+1) %2
+                if sign:
+                    coeff = S.NegativeOne*c
+                else:
+                    coeff = c
+
+                #
+                #  Call next level of recursion
+                #  ============================
+                #
+                # We now need to find more contractions among operators
+                #
+                # oplist = string1[:i]+ string1[i+1:j] + string1[j+1:]
+                #
+                # To prevent overcounting, we don't allow contractions
+                # we have already encountered. i.e. contractions between
+                #       string1[:i] <---> string1[i+1:j]
+                # and   string1[:i] <---> string1[j+1:].
+                #
+                # This leaves the case:
+                oplist = string1[i+1:j] + string1[j+1:]
+
+                if oplist:
+
+                    result.append(coeff*NO(
+                        Mul(*string1[:i])*_get_contractions( oplist,
+                            keep_only_fully_contracted=keep_only_fully_contracted)))
+
+                else:
+                    result.append(coeff*NO( Mul(*string1[:i])))
+
+
+        if keep_only_fully_contracted:
+            break   # next iteration over i leaves leftmost operator string1[0] uncontracted
+
+    return Add(*result)
 
 def wicks(e, **kw_args):
     """Determines the normal ordered equivalent of an expression using Wicks
@@ -942,6 +1165,93 @@ def wicks(e, **kw_args):
     if not e:
         return S.Zero
 
+    opts={
+            'simplify_kronecker_deltas':False,
+            'expand':True,
+            'simplify_dummies':False,
+            'keep_only_fully_contracted':False
+            }
+    opts.update(kw_args)
+
+
+    # check if we are already normally ordered
+    if isinstance(e,NO):
+        if opts['keep_only_fully_contracted']:
+            return S.Zero
+        else:
+            return e
+    elif isinstance(e,FermionicOperator):
+        if opts['keep_only_fully_contracted']:
+            return S.Zero
+        else:
+            return e
+
+    # break up any NO-objects, and evaluate commutators
+    e = e.doit()
+    for no in e.atoms(NO):
+        e = e.subs(no, no.doit(remove_brackets=True))
+
+    # make sure we have only one term to consider
+    e = e.expand()
+    if isinstance(e, Add):
+        if opts['simplify_dummies']:
+            return substitute_dummies(Add(*[ wicks(term, **kw_args) for term in e.args]))
+        else:
+            return Add(*[ wicks(term, **kw_args) for term in e.args])
+
+
+    # For Mul-objects we can actually do something
+    if isinstance(e, Mul):
+
+        # we dont want to mess around with commuting part of Mul
+        # so we factorize it out before starting recursion
+        c_part = []
+        string1 = []
+        for factor in e.args:
+            if factor.is_commutative:
+                c_part.append(factor)
+            else:
+                string1.append(factor)
+        n = len(string1)
+
+
+        # catch trivial cases
+        if n == 0:
+            result= e
+        elif n==1:
+            if opts['keep_only_fully_contracted']:
+                return S.Zero
+            else:
+                result = e
+
+        else: # non-trivial
+
+            if isinstance(string1[0], BosonicOperator):
+                raise NotImplementedError
+
+            string1 = tuple(string1)
+
+            # recursion over higher order contractions
+            result = _get_contractions(string1,
+                keep_only_fully_contracted=opts['keep_only_fully_contracted'] )
+            result =  Mul(*c_part)*result
+
+        if opts['expand']:
+            result = result.expand()
+        if opts['simplify_kronecker_deltas']:
+            result = evaluate_deltas(result)
+
+        return result
+
+    # there was nothing to do
+    return e
+    
+
+
+
+    if not e:
+        return S.Zero
+
     opts = {'simplify_kronecker_deltas': False,
             'expand': True,
             'simplify_dummies': False,
@@ -955,8 +1265,9 @@ def wicks(e, **kw_args):
         else:
             return e
 
-    e = e.doit(wicks=True)
-
+    e = e.doit()
+    print e, e.atoms(NO)
+    
     e = e.expand()
     if isinstance(e, Add):
         if opts['simplify_dummies']:
@@ -969,12 +1280,12 @@ def wicks(e, **kw_args):
         # we dont want to mess around with commuting part of Mul
         # so we factorize it out before starting recursion
         c_part, nc_part = e.args_cnc()
-        n = len(nc_parts)
+        n = len(nc_part)
 
         if n == 0:
             result = e
         elif n == 1:
-            if opts['keep_opts_fully_contracted']:
+            if opts['keep_only_fully_contracted']:
                 return S.Zero
             else:
                 result = e
@@ -991,6 +1302,112 @@ def wicks(e, **kw_args):
         return result
     # There was nothing to do
     return e
+
+def evaluate_deltas(e):
+    """
+    We evaluate KroneckerDelta symbols in the expression assuming Einstein summation.
+
+    If one index is repeated it is summed over and in effect substituted with
+    the other one. If both indices are repeated we substitute according to what
+    is the preferred index.  this is determined by
+    KroneckerDelta.preferred_index and KroneckerDelta.killable_index.
+
+    In case there are no possible substitutions or if a substitution would
+    imply a loss of information, nothing is done.
+
+    In case an index appears in more than one KroneckerDelta, the resulting
+    substitution depends on the order of the factors.  Since the ordering is platform
+    dependent, the literal expression resulting from this function may be hard to
+    predict.
+
+    Examples
+    ========
+
+    We assume the following:
+
+    >>> from sympy import symbols, Function, Dummy, KroneckerDelta
+    >>> from sympy.physics.secondquant import evaluate_deltas
+    >>> i,j = symbols('i j', below_fermi=True, cls=Dummy)
+    >>> a,b = symbols('a b', above_fermi=True, cls=Dummy)
+    >>> p,q = symbols('p q', cls=Dummy)
+    >>> f = Function('f')
+    >>> t = Function('t')
+
+    The order of preference for these indices according to KroneckerDelta is
+    (a, b, i, j, p, q).
+
+    Trivial cases:
+
+    >>> evaluate_deltas(KroneckerDelta(i,j)*f(i))       # d_ij f(i) -> f(j)
+    f(_j)
+    >>> evaluate_deltas(KroneckerDelta(i,j)*f(j))       # d_ij f(j) -> f(i)
+    f(_i)
+    >>> evaluate_deltas(KroneckerDelta(i,p)*f(p))       # d_ip f(p) -> f(i)
+    f(_i)
+    >>> evaluate_deltas(KroneckerDelta(q,p)*f(p))       # d_qp f(p) -> f(q)
+    f(_q)
+    >>> evaluate_deltas(KroneckerDelta(q,p)*f(q))       # d_qp f(q) -> f(p)
+    f(_p)
+
+    More interesting cases:
+
+    >>> evaluate_deltas(KroneckerDelta(i,p)*t(a,i)*f(p,q))
+    f(_i, _q)*t(_a, _i)
+    >>> evaluate_deltas(KroneckerDelta(a,p)*t(a,i)*f(p,q))
+    f(_a, _q)*t(_a, _i)
+    >>> evaluate_deltas(KroneckerDelta(p,q)*f(p,q))
+    f(_p, _p)
+
+    Finally, here are some cases where nothing is done, because that would
+    imply a loss of information:
+
+    >>> evaluate_deltas(KroneckerDelta(i,p)*f(q))
+    f(_q)*KroneckerDelta(_i, _p)
+    >>> evaluate_deltas(KroneckerDelta(i,p)*f(i))
+    f(_i)*KroneckerDelta(_i, _p)
+    """
+
+
+    # We treat Deltas only in mul objects
+
+    # for general function objects we don't evaluate KroneckerDeltas in arguments,
+    # but here we hard code exceptions to this rule
+    accepted_functions = (
+            Add,
+            )
+    if isinstance(e, accepted_functions):
+        return e.func(*[evaluate_deltas(arg) for arg in e.args])
+
+    elif isinstance(e,Mul):
+        # find all occurences of delta function and count each index present in
+        # expression.
+        deltas = []
+        indices = {}
+        for i in e.args:
+            for s in i.atoms():
+                if s in indices:
+                    indices[s] += 1
+                else:
+                    indices[s] = 0  # geek counting simplifies logic below
+            if isinstance(i, KroneckerDelta): deltas.append(i)
+
+        for d in deltas:
+            # If we do something, and there are more deltas, we should recurse
+            # to treat the resulting expression properly
+            if indices[d.killable_index]:
+                e = e.subs(d.killable_index,d.preferred_index)
+                if len(deltas)>1: return evaluate_deltas(e)
+            elif indices[d.preferred_index] and d.indices_contain_equal_information:
+                e = e.subs(d.preferred_index,d.killable_index)
+                if len(deltas)>1: return evaluate_deltas(e)
+            else:
+                pass
+
+        return e
+    # nothing to do, maybe we hit a Symbol or a number
+    else:
+        return e
+
 
 def _fermionic_key(state):
     # Sort key for fermionic operators

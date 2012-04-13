@@ -1,13 +1,13 @@
 from sympy.physics.quantum.secondquant import (
     B, Bd, CreateBoson, AnnihilateBoson, BosonicOperator, BBra, BKet,
     BosonState, F, Fd, CreateFermion, AnnihilateFermion, FBra, FKet,
-    FermionicOperator, FermionState, NO
+    FermionicOperator, FermionState, NO, wicks, contraction, evaluate_deltas
 )
 from sympy.physics.quantum import (
     Commutator, Dagger, InnerProduct, qapply
 )
 
-from sympy import expand, KroneckerDelta, sqrt, symbols
+from sympy import Dummy, expand, KroneckerDelta, sqrt, symbols
 from sympy.utilities.pytest import XFAIL
 
 h1, h2, h3 = symbols('h1 h2 h3',below_fermi=True)
@@ -41,9 +41,10 @@ def test_commutator():
     assert Commutator(B(p1), B(p2)).doit() == 0
     assert Commutator(Bd(p1), Bd(p2)).doit() == 0
     # Fermion commutator
-    """c = Commutator(F(m), Fd(m))
-    assert c == +1 - 2*NO(Fd(m)*F(m))
-    c = Commutator(Fd(m), F(m))
+    n, m = symbols("n,m", above_fermi=True)
+    c = Commutator(F(m), Fd(m)).doit()
+    assert c == 1 - 2*NO(Fd(m)*F(m))
+    c = Commutator(Fd(m), F(m)).doit().expand()
     assert c == -1 + 2*NO(Fd(m)*F(m))
 
     C = Commutator
@@ -57,9 +58,10 @@ def test_commutator():
     p,q,r,s = symbols('p,q,r,s')
     D=KroneckerDelta
 
-    assert C(Fd(a),F(i)) == -2*NO(F(i)*Fd(a))
-    assert C(Fd(j),NO(Fd(a)*F(i))).doit(wicks=True) == -D(j,i)*Fd(a)
-    assert C(Fd(a)*F(i),Fd(b)*F(j)).doit(wicks=True) == 0"""
+    assert C(Fd(a),F(i)).doit() == -2*NO(F(i)*Fd(a))
+    # TODO: use wicks theorem to do commutator
+    #assert C(Fd(j),NO(Fd(a)*F(i))).doit() == -D(j,i)*Fd(a)
+    #assert C(Fd(a)*F(i),Fd(b)*F(j)).doit() == 0
 
 def test_boson_operators():
     # Creation operators
@@ -255,7 +257,7 @@ def test_symbolic_matrix_elements():
     for i in range(len(diag)):
         assert diag[i] == m[i, i]"""
 
-"""def test_wicks():
+def test_wicks():
     p,q,r,s = symbols('p,q,r,s',above_fermi=True)
 
     # Testing for particles only
@@ -306,12 +308,12 @@ def test_symbolic_matrix_elements():
             KroneckerDelta(b,d)*NO(F(a)*Fd(c)) -
             KroneckerDelta(a,c)*KroneckerDelta(b,d)+
             KroneckerDelta(a,d)*NO(F(b)*Fd(c)) +
-            NO(F(a)*F(b)*Fd(c)*Fd(d)))"""
+            NO(F(a)*F(b)*Fd(c)*Fd(d)))
 
 def test_NO():
     i,j,k,l = symbols('i j k l',below_fermi=True)
     a,b,c,d = symbols('a b c d',above_fermi=True)
-    p,q,r,s = symbols('p q r s')
+    p,q,r,s = symbols('p q r s', cls=Dummy)
 
     assert (NO(Fd(p)*F(q) + Fd(a)*F(b))==
        NO(Fd(p)*F(q)) + NO(Fd(a)*F(b)))
@@ -336,12 +338,6 @@ def test_NO():
     assert wicks(expr) == NO(expr)
 
     assert NO(Fd(a)*F(b)) == - NO(F(b)*Fd(a))
-
-    no =  NO(Fd(a)*F(i)*F(b)*Fd(j))
-    l1 = [ ind for ind in no.iter_q_creators() ]
-    assert l1 == [0,1]
-    l2 = [ ind for ind in no.iter_q_annihilators() ]
-    assert l2 == [3,2]
 
 """def test_sorting():
     i,j = symbols('i,j',below_fermi=True)
@@ -380,7 +376,7 @@ def test_NO():
     assert _sort_anticommuting_fermions([F(a), F(i)]) == ([F(i), F(a)], 1)
     assert _sort_anticommuting_fermions([F(i), F(a)]) == ([F(i), F(a)], 0)"""
 
-"""def test_contraction():
+def test_contraction():
     i,j,k,l = symbols('i,j,k,l',below_fermi=True)
     a,b,c,d = symbols('a,b,c,d',above_fermi=True)
     p,q,r,s = symbols('p,q,r,s')
@@ -394,7 +390,7 @@ def test_NO():
     restr = evaluate_deltas(contraction(Fd(p),F(q)))
     assert restr.is_only_below_fermi
     restr = evaluate_deltas(contraction(F(p),Fd(q)))
-    assert restr.is_only_above_fermi"""
+    assert restr.is_only_above_fermi
 
 """def test_Tensors():
     i,j,k,l = symbols('i j k l',below_fermi=True,cls=Dummy)
