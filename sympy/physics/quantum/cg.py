@@ -574,9 +574,11 @@ def _check_varsh_872_9(term_list):
 
     return term_list, other1+other2+other4
 
-def _check_cg_simp2(terms, expr, simp, wilds, const, index, index_max, sign=None):
+def _check_cg_simp2(terms, expr, simp, wilds, const, index, index_max, index_sign=1):
+    from sympy import sign
     lt = Wild('lt')
     wilds.append(lt)
+    index_sign = sign(lt)
     # determine all matches
     # they are placed in a dict, indexed by the const terms
     matches = {}
@@ -589,7 +591,7 @@ def _check_cg_simp2(terms, expr, simp, wilds, const, index, index_max, sign=None
             other_terms.append(term)
             continue
         # match succeeds, add to matches dict
-        match_const = tuple([match_sub[i] for i in const])
+        match_const = tuple([match_sub[i] for i in const] + [index_sign.subs(match_sub)])
         match_list = matches.pop(match_const, [])
         match_list.append(match_sub)
         matches[match_const] = match_list
