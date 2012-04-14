@@ -143,7 +143,7 @@ def test_cg_simp_sum():
     x, a, b, c, cp, alpha, beta, gamma, gammap = symbols('x a b c cp alpha beta gamma gammap')
     # Varshalovich 8.7.1 Eq 1
     assert cg_simp(x * Sum(CG(a,alpha,b,0,a,alpha), (alpha,-a,a))) == x*(2*a+1)*KroneckerDelta(b,0)
-    assert cg_simp(x * Sum(CG(a,alpha,b,0,a,alpha), (alpha,-a,a))+CG(1,0,1,0,1,0)) == x*(2*a+1)*KroneckerDelta(b,0)+CG(1,0,1,0,1,0)
+    assert cg_simp(x * Sum(CG(a,alpha,b,0,a,alpha), (alpha,-a,a))+CG(1,0,1,0,1,0)) == x*2*a*KroneckerDelta(b,0)+x*KroneckerDelta(b,0)+CG(1,0,1,0,1,0)
     assert cg_simp(2 * Sum(CG(1,alpha,0,0,1,alpha), (alpha,-1,1))) == 6
     # Varshalovich 8.7.1 Eq 2
     assert cg_simp(x*Sum((-1)**(a-alpha) * CG(a,alpha,a,-alpha,c,0), (alpha,-a,a))) == x*sqrt(2*a+1)*KroneckerDelta(c,0)

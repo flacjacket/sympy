@@ -4,7 +4,7 @@
 # -Implement new simpifications
 """Clebsch-Gordon Coefficients."""
 
-from sympy import (Add, expand, Eq, Expr, Mul, Piecewise, Pow, sqrt, Sum,
+from sympy import (Add, expand, Eq, Expr, Mul, Piecewise, Pow, sqrt, sign, Sum,
                    symbols, sympify, Wild)
 from sympy.printing.pretty.stringpict import prettyForm, stringPict
 
@@ -477,10 +477,12 @@ def cg_simp(e):
 
     .. [1] Varshalovich, D A, Quantum Theory of Angular Momentum. 1988.
     """
+    for sums in e.atoms(Sum):
+        new_term = _cg_simp_sum(sums)
+        e = e.subs(sums, new_term)
+
     if isinstance(e, Add):
         return _cg_simp_add(e)
-    elif isinstance(e, Sum):
-        return _cg_simp_sum(e)
     elif isinstance(e, Mul):
         return Mul(*[cg_simp(arg) for arg in e.args])
     elif isinstance(e, Pow):
@@ -499,48 +501,25 @@ def _cg_simp_add(e):
     is then passed to the simplification methods, which return the new cg_part
     and any additional terms that are added to other_part
     """
-    cg_part = []
-    other_part = []
-
     e = expand(e)
-    for arg in e.args:
-        if arg.has(CG):
-            if isinstance(arg, Sum):
-                other_part.append(_cg_simp_sum(arg))
-            elif isinstance(arg, Mul):
-                terms = 1
-                for term in arg.args:
-                    if isinstance(term, Sum):
-                        terms *= _cg_simp_sum(term)
-                    else:
-                        terms *= term
-                if terms.has(CG):
-                    cg_part.append(terms)
-                else:
-                    other_part.append(terms)
-            else:
-                cg_part.append(arg)
-        else:
-            other_part.append(arg)
+    cg_part = [arg for arg in e.args if arg.has(CG)]
+    other_part = [arg for arg in e.args if not arg.has(CG)]
 
-    cg_part, other = _check_varsh_871_1(cg_part)
-    other_part.append(other)
     cg_part, other = _check_varsh_871_2(cg_part)
     other_part.append(other)
     cg_part, other = _check_varsh_872_9(cg_part)
     other_part.append(other)
-    return Add(*cg_part)+Add(*other_part)
 
-def _check_varsh_871_1(term_list):
+    # Varshalovich Eq 871.1
     # Sum( CG(a,alpha,b,0,a,alpha), (alpha, -a, a)) == KroneckerDelta(b,0)
-    a,alpha,b,lt = map(Wild,('a','alpha','b','lt'))
-    expr = lt*CG(a,alpha,b,0,a,alpha)
+    param = a, alpha, b = map(Wild,('a','alpha','b'))
+    expr = CG(a,alpha,b,0,a,alpha)
     simp = (2*a+1)*KroneckerDelta(b,0)
-    sign = lt/abs(lt)
-    build_expr = 2*a+1
-    index_expr = a+alpha
-    return _check_cg_simp(expr, simp, sign, lt, term_list, (a,alpha,b,lt), (a,b), build_expr, index_expr)
+    const_param = a, b
+    cg_part, other = _check_cg_simp2(cg_part, expr, simp, param, const_param, a+alpha, 2*a)
+    other_part.extend(other)
 
+    return Add(*cg_part)+Add(*other_part)
 
 def _check_varsh_871_2(term_list):
     # Sum((-1)**(a-alpha)*CG(a,alpha,a,-alpha,c,0),(alpha,-a,a))
@@ -594,6 +573,54 @@ def _check_varsh_872_9(term_list):
     term_list, other4 = _check_cg_simp(expr, simp, sign, sympify(1), term_list, (a,alpha,alphap,b,beta,betap,c,gamma), (a,alpha,alphap,b,beta,betap), build_expr, index_expr)
 
     return term_list, other1+other2+other4
+
+def _check_cg_simp2(terms, expr, simp, wilds, const, index, index_max, sign=None):
+    lt = Wild('lt')
+    wilds.append(lt)
+    # determine all matches
+    # they are placed in a dict, indexed by the const terms
+    matches = {}
+    cg_terms = []
+    other_terms = []
+    for term in terms:
+        match_sub = _check_cg(term, lt*expr, len(wilds))
+        # match fails, so add term to list of cg terms
+        if match_sub is None:
+            other_terms.append(term)
+            continue
+        # match succeeds, add to matches dict
+        match_const = tuple([match_sub[i] for i in const])
+        match_list = matches.pop(match_const, [])
+        match_list.append(match_sub)
+        matches[match_const] = match_list
+
+    for match_list in matches.itervalues():
+        # the list of the indicies for each term matched
+        index_list = [index.subs(match) for match in match_list]
+        # the indicies that we must have
+        index_range_max = index_max.subs(match_list[0])
+        index_range = range(index_range_max+1)
+        # if all the indicies were matched
+        if all([i in index_list for i in index_range]):
+            # list of all matches with correct index
+            cg_matches = [match_list[index_list.index(i)] for i in index_range]
+            # list of all other matches
+            other_matches = [i for i in match_list if i not in cg_matches]
+            # determine the new term and add to other_terms
+            new_lt = min([match[lt] for match in cg_matches])
+            new_term = new_lt * simp.subs(match_list[0])
+            other_terms.append(new_term)
+            # based on leading terms, create new list of terms that survive
+            for match in cg_matches:
+                match[lt] -= new_lt
+            cg_matches = [match for match in cg_matches if not match[lt] == 0]
+            # add surviving terms to cg_terms
+            cg_terms.extend([expr.subs(term) for term in cg_matches])
+            cg_terms.extend([expr.subs(term) for term in other_matches])
+        else:
+            cg_terms.extend([expr.subs(term) for term in match_list])
+
+    return cg_terms, other_terms
 
 def _check_cg_simp(expr, simp, sign, lt, term_list, variables, dep_variables, build_index_expr, index_expr):
     """ Checks for simplifications that can be made, returning a tuple of the
