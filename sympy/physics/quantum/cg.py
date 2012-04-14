@@ -4,8 +4,8 @@
 # -Implement new simpifications
 """Clebsch-Gordon Coefficients."""
 
-from sympy import (Add, expand, Eq, Expr, Mul, Piecewise, Pow, sqrt, sign, Sum,
-                   symbols, sympify, Wild)
+from sympy import (Add, expand, Eq, Expr, Mul, Piecewise, Pow, S, sqrt, sign,
+                   Sum, symbols, sympify, Wild)
 from sympy.printing.pretty.stringpict import prettyForm, stringPict
 
 from sympy.functions.special.tensor_functions import KroneckerDelta
@@ -505,31 +505,46 @@ def _cg_simp_add(e):
     cg_part = [arg for arg in e.args if arg.has(CG)]
     other_part = [arg for arg in e.args if not arg.has(CG)]
 
-    cg_part, other = _check_varsh_871_2(cg_part)
-    other_part.append(other)
-    cg_part, other = _check_varsh_872_9(cg_part)
-    other_part.append(other)
+    #cg_part, other = _check_varsh_872_9(cg_part)
+    #other_part.append(other)
 
-    # Varshalovich Eq 871.1
+    # Varshalovich Eq 8.7.1 Eq 1
     # Sum( CG(a,alpha,b,0,a,alpha), (alpha, -a, a)) == KroneckerDelta(b,0)
     param = a, alpha, b = map(Wild,('a','alpha','b'))
     expr = CG(a,alpha,b,0,a,alpha)
     simp = (2*a+1)*KroneckerDelta(b,0)
     const_param = a, b
-    cg_part, other = _check_cg_simp2(cg_part, expr, simp, param, const_param, a+alpha, 2*a)
+    index_expr = a+alpha
+    index_max = 2*a
+    cg_part, other = _check_cg_simp(cg_part, expr, simp, param, const_param, index_expr, index_max)
+    other_part.extend(other)
+
+    # Varshalovich Eq 8.7.1 Eq 2
+    # Sum((-1)**(a-alpha)*CG(a,alpha,a,-alpha,c,0),(alpha,-a,a))
+    param = a, alpha, c = map(Wild,('a','alpha','c'))
+    expr = CG(a,alpha,a,-alpha,c,0)
+    simp = sqrt(2*a+1)*KroneckerDelta(c,0)
+    sign = (-1)**(a-alpha)
+    const_param = a, c
+    index_expr = a+alpha
+    index_max = 2*a
+    cg_part, other = _check_cg_simp(cg_part, expr, simp, param, const_param, index_expr, index_max, sign)
+    other_part.extend(other)
+
+    # Varshalovich Eq 8.7.2 Eq 9
+    # Sum( CG(a,alpha,b,beta,c,gamma)*CG(a,alpha',b,beta',c,gamma), (gamma, -c, c), (c, abs(a-b), a+b))
+    param = a,alpha,alphap,b,beta,betap,c,gamma = map(Wild, ('a','alpha','alphap','b','beta','betap','c','gamma'))
+    expr = CG(a,alpha,b,beta,c,gamma)**2
+    simp = S.One
+    const_param = a, alpha, b, beta
+    x = abs(a-b)
+    y = abs(alpha+beta)
+    index_expr = a + b - c
+    index_max = a + b - abs(x - y)
+    cg_part, other = _check_cg_simp(cg_part, expr, simp, param, const_param, index_expr, index_max)
     other_part.extend(other)
 
     return Add(*cg_part)+Add(*other_part)
-
-def _check_varsh_871_2(term_list):
-    # Sum((-1)**(a-alpha)*CG(a,alpha,a,-alpha,c,0),(alpha,-a,a))
-    a,alpha,c,lt = map(Wild,('a','alpha','c','lt'))
-    expr = lt*CG(a,alpha,a,-alpha,c,0)
-    simp = sqrt(2*a+1)*KroneckerDelta(c,0)
-    sign = (-1)**(a-alpha)*lt/abs(lt)
-    build_expr = 2*a+1
-    index_expr = a+alpha
-    return _check_cg_simp(expr, simp, sign, lt, term_list, (a,alpha,c,lt), (a,c), build_expr, index_expr)
 
 def _check_varsh_872_9(term_list):
     # Sum( CG(a,alpha,b,beta,c,gamma)*CG(a,alpha',b,beta',c,gamma), (gamma, -c, c), (c, abs(a-b), a+b))
@@ -544,14 +559,14 @@ def _check_varsh_872_9(term_list):
     y = abs(alpha+beta)
     build_expr = a+b+1-Piecewise((x,x>y),(0,Eq(x,y)),(y,y>x))
     index_expr = a+b-c
-    term_list, other1 = _check_cg_simp(expr, simp, sign, lt, term_list, (a,alpha,b,beta,c,gamma,lt), (a,alpha,b,beta), build_expr, index_expr)
+    term_list, other1 = _check_cg_simp2(expr, simp, sign, lt, term_list, (a,alpha,b,beta,c,gamma,lt), (a,alpha,b,beta), build_expr, index_expr)
 
     # For symbolic alpha,beta
     x = abs(a-b)
     y = a+b
     build_expr = (y+1-x)*(x+y+1)
     index_expr = (c-x)*(x+c)+c+gamma
-    term_list, other2 = _check_cg_simp(expr, simp, sign, lt, term_list, (a,alpha,b,beta,c,gamma,lt), (a,alpha,b,beta), build_expr, index_expr)
+    term_list, other2 = _check_cg_simp2(expr, simp, sign, lt, term_list, (a,alpha,b,beta,c,gamma,lt), (a,alpha,b,beta), build_expr, index_expr)
 
     # Case alpha!=alphap or beta!=betap
     # Note: this only works with leading term of 1, pattern matching is unable to match when there is a Wild leading term
@@ -563,22 +578,21 @@ def _check_varsh_872_9(term_list):
     y = abs(alpha+beta)
     build_expr = a+b+1-Piecewise((x,x>y),(0,Eq(x,y)),(y,y>x))
     index_expr = a+b-c
-    term_list, other3 = _check_cg_simp(expr, simp, sign, sympify(1), term_list, (a,alpha,alphap,b,beta,betap,c,gamma), (a,alpha,alphap,b,beta,betap), build_expr, index_expr)
+    term_list, other3 = _check_cg_simp2(expr, simp, sign, sympify(1), term_list, (a,alpha,alphap,b,beta,betap,c,gamma), (a,alpha,alphap,b,beta,betap), build_expr, index_expr)
 
     # For symbolic alpha,alphap,beta,betap
     x = abs(a-b)
     y = a+b
     build_expr = (y+1-x)*(x+y+1)
     index_expr = (c-x)*(x+c)+c+gamma
-    term_list, other4 = _check_cg_simp(expr, simp, sign, sympify(1), term_list, (a,alpha,alphap,b,beta,betap,c,gamma), (a,alpha,alphap,b,beta,betap), build_expr, index_expr)
+    term_list, other4 = _check_cg_simp2(expr, simp, sign, sympify(1), term_list, (a,alpha,alphap,b,beta,betap,c,gamma), (a,alpha,alphap,b,beta,betap), build_expr, index_expr)
 
     return term_list, other1+other2+other4
 
-def _check_cg_simp2(terms, expr, simp, wilds, const, index, index_max, index_sign=1):
+def _check_cg_simp(terms, expr, simp, wilds, const, index, index_max, index_sign=1):
     from sympy import sign
     lt = Wild('lt')
     wilds.append(lt)
-    index_sign = sign(lt)
     expr *= lt
     # determine all matches
     # they are placed in a dict, indexed by the const terms
@@ -586,13 +600,13 @@ def _check_cg_simp2(terms, expr, simp, wilds, const, index, index_max, index_sig
     cg_terms = []
     other_terms = []
     for term in terms:
-        match_sub = _check_cg(term, expr, len(wilds))
+        match_sub = term.match(expr)
         # match fails, so add term to list of cg terms
         if match_sub is None:
-            other_terms.append(term)
+            cg_terms.append(term)
             continue
         # match succeeds, add to matches dict
-        match_const = tuple([match_sub[i] for i in const] + [index_sign.subs(match_sub)])
+        match_const = tuple([match_sub[i] for i in const] + [(sign(lt)*index_sign).subs(match_sub)])
         match_list = matches.pop(match_const, [])
         match_list.append(match_sub)
         matches[match_const] = match_list
@@ -602,6 +616,9 @@ def _check_cg_simp2(terms, expr, simp, wilds, const, index, index_max, index_sig
         index_list = [index.subs(match) for match in match_list]
         # the indicies that we must have
         index_range_max = index_max.subs(match_list[0])
+        if not index_range_max.is_number:
+            cg_terms.extend([expr.subs(term) for term in match_list])
+            continue
         index_range = range(index_range_max+1)
         # if all the indicies were matched
         if all([i in index_list for i in index_range]):
@@ -610,12 +627,12 @@ def _check_cg_simp2(terms, expr, simp, wilds, const, index, index_max, index_sig
             # list of all other matches
             other_matches = [i for i in match_list if i not in cg_matches]
             # determine the new term and add to other_terms
-            new_lt = index_sign.subs(match_list[0]) * min([abs(match[lt]) for match in cg_matches])
+            new_lt = sign(lt*index_sign).subs(cg_matches[0]) * min([abs(match[lt]) for match in cg_matches])
             new_term = new_lt * simp.subs(match_list[0])
             other_terms.append(new_term)
             # based on leading terms, create new list of terms that survive
             for match in cg_matches:
-                match[lt] -= new_lt
+                match[lt] -= new_lt * sign(index_sign).subs(match)
             cg_matches = [match for match in cg_matches if not match[lt] == 0]
             # add surviving terms to cg_terms
             cg_terms.extend([expr.subs(term) for term in cg_matches])
@@ -625,7 +642,7 @@ def _check_cg_simp2(terms, expr, simp, wilds, const, index, index_max, index_sig
 
     return cg_terms, other_terms
 
-def _check_cg_simp(expr, simp, sign, lt, term_list, variables, dep_variables, build_index_expr, index_expr):
+def _check_cg_simp2(expr, simp, sign, lt, term_list, variables, dep_variables, build_index_expr, index_expr):
     """ Checks for simplifications that can be made, returning a tuple of the
     simplified list of terms and any terms generated by simplification.
 
@@ -698,20 +715,6 @@ def _check_cg_simp(expr, simp, sign, lt, term_list, variables, dep_variables, bu
         else:
             i += 1
     return term_list, other_part
-
-def _check_cg(cg_term, expr, length, sign=None):
-    """Checks whether a term matches the given expression"""
-    # TODO: Check for symmetries
-    matches = cg_term.match(expr)
-    if matches is None:
-        return
-    if sign is not None:
-        if not isinstance(sign, tuple):
-            raise TypeError('sign must be a tuple')
-        if not sign[0] == (sign[1]).subs(matches):
-            return
-    if len(matches) == length:
-        return matches
 
 def _cg_simp_sum(e):
     e = _check_varsh_sum_871_1(e)
