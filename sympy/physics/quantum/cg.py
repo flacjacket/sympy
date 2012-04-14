@@ -579,13 +579,14 @@ def _check_cg_simp2(terms, expr, simp, wilds, const, index, index_max, index_sig
     lt = Wild('lt')
     wilds.append(lt)
     index_sign = sign(lt)
+    expr *= lt
     # determine all matches
     # they are placed in a dict, indexed by the const terms
     matches = {}
     cg_terms = []
     other_terms = []
     for term in terms:
-        match_sub = _check_cg(term, lt*expr, len(wilds))
+        match_sub = _check_cg(term, expr, len(wilds))
         # match fails, so add term to list of cg terms
         if match_sub is None:
             other_terms.append(term)
@@ -609,7 +610,7 @@ def _check_cg_simp2(terms, expr, simp, wilds, const, index, index_max, index_sig
             # list of all other matches
             other_matches = [i for i in match_list if i not in cg_matches]
             # determine the new term and add to other_terms
-            new_lt = min([match[lt] for match in cg_matches])
+            new_lt = index_sign.subs(match_list[0]) * min([abs(match[lt]) for match in cg_matches])
             new_term = new_lt * simp.subs(match_list[0])
             other_terms.append(new_term)
             # based on leading terms, create new list of terms that survive
