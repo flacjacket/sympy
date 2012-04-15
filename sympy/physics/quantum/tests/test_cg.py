@@ -3,6 +3,7 @@ from sympy import S, sqrt, Sum, symbols
 from sympy.physics.quantum.cg import Wigner3j, Wigner6j, Wigner9j, CG, cg_simp
 from sympy.functions.special.tensor_functions import KroneckerDelta
 
+from sympy.utilities.pytest import XFAIL
 
 def test_cg_simp_add():
     j, m1, m1p, m2, m2p = symbols('j m1 m1p m2 m2p')
@@ -114,6 +115,10 @@ def test_cg_simp_add():
     assert cg_simp(4*(a+b+c+d+e+f+g+h+i)) == 4
     assert cg_simp(a+b+2*c+d+4*e+f+g+h+i) == 1+c+3*e
     assert cg_simp(-a-b-c-d-e-f-g-h-i) == -1
+
+@XFAIL
+def test_cg_simp_sum_matching():
+    # Test Varshalovich 8.7.2 Eq 9
     # alpha!=alphap or beta!=betap case
     # numerical
     a = CG(S(1)/2,S(1)/2,S(1)/2,-S(1)/2,1,0)*CG(S(1)/2,-S(1)/2,S(1)/2,S(1)/2,1,0)
