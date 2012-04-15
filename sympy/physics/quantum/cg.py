@@ -665,25 +665,27 @@ def __match_cg_add(terms, expr, simp, wilds, const, index, index_max, index_sign
     return cg_terms, other_terms
 
 def _cg_simp_sum(e):
+    a, alpha, b, beta, c, cp, gamma, gammap = symbols('a alpha b beta c cp gamma gammap', cls=Wild)
     # Varshalovich Eq 8.7.1 Eq 1
     # Sum( CG(a,alpha,b,0,a,alpha), (alpha, -a, a)) == KroneckerDelta(b,0)
-    a, alpha, b = symbols('a alpha b', cls=Wild)
-    match = e.match(Sum(CG(a,alpha,b,0,a,alpha),(alpha,-a,a)))
+    expr = Sum(CG(a,alpha,b,0,a,alpha),(alpha,-a,a))
+    match = e.match(expr)
     if match is not None:
         return ((2*a+1)*KroneckerDelta(b,0)).subs(match)
     # Varshalovich Eq 8.7.1 Eq 2
     # Sum((-1)**(a-alpha)*CG(a,alpha,a,-alpha,c,0),(alpha,-a,a))
-    a, alpha, c = symbols('a alpha c', cls=Wild)
-    match = e.match(Sum((-1)**(a-alpha)*CG(a,alpha,a,-alpha,c,0),(alpha,-a,a)))
+    expr = Sum((-1)**(a-alpha)*CG(a,alpha,a,-alpha,c,0),(alpha,-a,a))
+    match = e.match(expr)
     if match is not None:
         return (sqrt(2*a+1)*KroneckerDelta(c,0)).subs(match)
     # Varshalovich Eq 8.7.2 Eq 9
     # Sum( CG(a,alpha,b,beta,c,gamma)*CG(a,alpha',b,beta',c,gamma), (gamma, -c, c), (c, abs(a-b), a+b))
-    a, alpha, b, beta, c, cp, gamma, gammap = symbols('a alpha b beta c cp gamma gammap', cls=Wild)
-    match = e.match(Sum(CG(a,alpha,b,beta,c,gamma)*CG(a,alpha,b,beta,cp,gammap),(alpha,-a,a),(beta,-b,b)))
+    expr = Sum(CG(a,alpha,b,beta,c,gamma)*CG(a,alpha,b,beta,cp,gammap),(alpha,-a,a),(beta,-b,b))
+    match = e.match(expr)
     if match is not None:
         return (KroneckerDelta(c,cp)*KroneckerDelta(gamma,gammap)).subs(match)
-    match = e.match(Sum(CG(a,alpha,b,beta,c,gamma)**2,(alpha,-a,a),(beta,-b,b)))
+    expr = Sum(CG(a,alpha,b,beta,c,gamma)**2,(alpha,-a,a),(beta,-b,b))
+    match = e.match(expr)
     if match is not None:
         return 1
     return e
