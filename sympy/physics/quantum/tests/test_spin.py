@@ -3524,7 +3524,7 @@ def test_jz():
     assert qapply(TensorProduct(1,Jz)*TensorProduct(JzKet(j1,m1),JzKet(j2,m2))) == \
         hbar*m2*TensorProduct(JzKet(j1,m1),JzKet(j2,m2))
 
-def test_jzket():
+def test_eval_args_jzket():
     j, m = symbols('j m')
     # j not integer or half integer
     raises(ValueError, lambda: JzKet(S(2)/3,-S(1)/3))
@@ -3540,7 +3540,7 @@ def test_jzket():
     # j-m not integer
     raises(ValueError, lambda: JzKet(1,S(1)/2))
 
-def test_jzketcoupled():
+def test_eval_args_jzketcoupled():
     j, m = symbols('j m')
     # j not integer or half integer
     raises(ValueError, lambda: JzKetCoupled(S(2)/3, -S(1)/3, (1,)))
@@ -3559,7 +3559,7 @@ def test_jzketcoupled():
     raises(TypeError, lambda: JzKetCoupled(1, 1, 1))
     raises(TypeError, lambda: JzKetCoupled(1, 1, (1,), 1))
     raises(TypeError, lambda: JzKetCoupled(1, 1, (1,1), (1,)))
-    raises(TypeError, lambda: JzKetCoupled(1, 1, (1,1,1), (1,2,1), (1,3,1)))
+    raises(ValueError, lambda: JzKetCoupled(1, 1, (1,1,1), (1,2,1), (1,3,1)))
     # checks length of coupling terms
     raises(ValueError, lambda: JzKetCoupled(1, 1, (1,), ((1,2,1),)))
     raises(ValueError, lambda: JzKetCoupled(1, 1, (1,1), ((1,2),)))

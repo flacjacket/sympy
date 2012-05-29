@@ -329,6 +329,10 @@ class OuterProduct(Operator):
         """Return the bra on the right side of the outer product."""
         return self.args[1]
 
+    @classmethod
+    def _eval_hilbert_space(cls, label):
+        return label[0].hilbert_space
+
     def _eval_dagger(self):
         return OuterProduct(Dagger(self.bra), Dagger(self.ket))
 
