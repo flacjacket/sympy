@@ -307,8 +307,6 @@ class QExpr(Expr):
         return self
 
     def _eval_rewrite(self, pattern, rule, **hints):
-        # TODO: Make Basic.rewrite get the rule using the class name rather
-        # than str(). See L1072 of basic.py.
         # This will call self.rule(*self.args) for rewriting.
         if hints.get('deep', False):
             args = [ a._eval_rewrite(pattern, rule, **hints) for a in self.args ]
@@ -407,13 +405,14 @@ def split_qexpr_parts(e):
 
 def dispatch_method(self, basename, arg, **options):
     """Dispatch a method to the proper handlers."""
-    method_name = '%s_%s' % (basename, arg.__class__.__name__)
-    if hasattr(self, method_name):
-        f = getattr(self, method_name)
-        # This can raise and we will allow it to propagate.
-        result = f(arg, **options)
-        if result is not None:
-            return result
+    for cls in type(arg).__mro__:
+        method_name = '%s_%s' % (basename, cls.__name__)
+        if hasattr(self, method_name):
+            f = getattr(self, method_name)
+            # This can raise and we will allow it to propagate.
+            result = f(arg, **options)
+            if result is not None:
+                return result
     raise NotImplementedError(
         "%s.%s can't handle: %r" % \
             (self.__class__.__name__, basename, arg)

@@ -108,37 +108,17 @@ class SpinOpBase(object):
     # _apply_* methods
     #-------------------------------------------------------------------------
 
-    def _apply_op(self, ket, orig_basis, **options):
+    def _apply_operator_SpinState(self, ket, **options):
+        # Ket is not an eigen state of the operator, we must rewrite it
         state = ket.rewrite(self.basis)
-        # If the state has only one term
-        if isinstance(state, State):
-            ret = (hbar*state.m) * state
         # state is a linear combination of states
-        elif isinstance(state, Sum):
+        if isinstance(state, Sum):
             ret = self._apply_operator_Sum(state, **options)
         else:
             ret = qapply(self*state)
         if ret == self*state:
             raise NotImplementedError
-        return ret.rewrite(orig_basis)
-
-    def _apply_operator_JxKet(self, ket, **options):
-        return self._apply_op(ket, 'Jx', **options)
-
-    def _apply_operator_JxKetCoupled(self, ket, **options):
-        return self._apply_op(ket, 'Jx', **options)
-
-    def _apply_operator_JyKet(self, ket, **options):
-        return self._apply_op(ket, 'Jy', **options)
-
-    def _apply_operator_JyKetCoupled(self, ket, **options):
-        return self._apply_op(ket, 'Jy', **options)
-
-    def _apply_operator_JzKet(self, ket, **options):
-        return self._apply_op(ket, 'Jz', **options)
-
-    def _apply_operator_JzKetCoupled(self, ket, **options):
-        return self._apply_op(ket, 'Jz', **options)
+        return ret.rewrite(ket.__class__)
 
     def _apply_operator_TensorProduct(self, tp, **options):
         # Uncoupling operator is only easily found for coordinate basis spin operators
@@ -167,7 +147,7 @@ class JplusOp(SpinOpBase, Operator):
 
     _coord = '+'
 
-    basis = 'Jz'
+    basis = 'JzKet'
 
     def matrix_element(self, j, m, jp, mp):
         result = hbar*sqrt(j*(j+S.One)-mp*(mp+S.One))
@@ -192,20 +172,12 @@ class JplusOp(SpinOpBase, Operator):
     def _apply_operator_JzKet(self, ket, **options):
         j = ket.j
         m = ket.m
+        args = ket.args[2:]
+        cls = ket.__class__
         if m.is_Number and j.is_Number:
             if m >= j:
                 return S.Zero
-        return hbar*sqrt(j*(j+S.One)-m*(m+S.One))*JzKet(j, m+S.One)
-
-    def _apply_operator_JzKetCoupled(self, ket, **options):
-        j = ket.j
-        m = ket.m
-        jn = ket.jn
-        coupling = ket.coupling
-        if m.is_Number and j.is_Number:
-            if m >= j:
-                return S.Zero
-        return hbar*sqrt(j*(j+S.One)-m*(m+S.One))*JzKetCoupled(j, m+S.One,jn,coupling)
+        return hbar * sqrt(j * (j+S.One) - m * (m+S.One)) * cls(j, m+S.One, *args)
 
     #-------------------------------------------------------------------------
     # _represent_* methods
@@ -223,7 +195,7 @@ class JminusOp(SpinOpBase, Operator):
 
     _coord = '-'
 
-    basis = 'Jz'
+    basis = 'JzKet'
 
     def matrix_element(self, j, m, jp, mp):
         result = hbar*sqrt(j*(j+S.One)-mp*(mp-S.One))
@@ -245,20 +217,12 @@ class JminusOp(SpinOpBase, Operator):
     def _apply_operator_JzKet(self, ket, **options):
         j = ket.j
         m = ket.m
+        args = ket.args[2:]
+        cls = ket.__class__
         if m.is_Number and j.is_Number:
             if m <= -j:
                 return S.Zero
-        return hbar*sqrt(j*(j+S.One)-m*(m-S.One))*JzKet(j, m-S.One)
-
-    def _apply_operator_JzKetCoupled(self, ket, **options):
-        j = ket.j
-        m = ket.m
-        jn = ket.jn
-        coupling = ket.coupling
-        if m.is_Number and j.is_Number:
-            if m <= -j:
-                return S.Zero
-        return hbar*sqrt(j*(j+S.One)-m*(m-S.One))*JzKetCoupled(j, m-S.One,jn,coupling)
+        return hbar * sqrt(j * (j+S.One) - m * (m-S.One)) * cls(j, m-S.One, *args)
 
     #-------------------------------------------------------------------------
     # _represent_* methods
@@ -276,7 +240,7 @@ class JxOp(SpinOpBase, HermitianOperator):
 
     _coord = 'x'
 
-    basis = 'Jx'
+    basis = 'JxKet'
 
     #-------------------------------------------------------------------------
     # _eval_* methods
@@ -295,14 +259,12 @@ class JxOp(SpinOpBase, HermitianOperator):
     # _apply_* methods
     #-------------------------------------------------------------------------
 
+    def _apply_operator_JxKet(self, ket, **options):
+        return hbar * ket.m * ket
+
     def _apply_operator_JzKet(self, ket, **options):
         jp = JplusOp(self.name)._apply_operator_JzKet(ket, **options)
         jm = JminusOp(self.name)._apply_operator_JzKet(ket, **options)
-        return (jp + jm)/Integer(2)
-
-    def _apply_operator_JzKetCoupled(self, ket, **options):
-        jp = JplusOp(self.name)._apply_operator_JzKetCoupled(ket, **options)
-        jm = JminusOp(self.name)._apply_operator_JzKetCoupled(ket, **options)
         return (jp + jm)/Integer(2)
 
     #-------------------------------------------------------------------------
@@ -323,7 +285,7 @@ class JyOp(SpinOpBase, HermitianOperator):
 
     _coord = 'y'
 
-    basis = 'Jy'
+    basis = 'JyKet'
 
     #-------------------------------------------------------------------------
     # _eval_* methods
@@ -342,14 +304,12 @@ class JyOp(SpinOpBase, HermitianOperator):
     # _apply_* methods
     #-------------------------------------------------------------------------
 
+    def _apply_operator_JyKet(self, ket, **options):
+        return hbar * ket.m * ket
+
     def _apply_operator_JzKet(self, ket, **options):
         jp = JplusOp(self.name)._apply_operator_JzKet(ket, **options)
         jm = JminusOp(self.name)._apply_operator_JzKet(ket, **options)
-        return (jp - jm)/(Integer(2)*I)
-
-    def _apply_operator_JzKetCoupled(self, ket, **options):
-        jp = JplusOp(self.name)._apply_operator_JzKetCoupled(ket, **options)
-        jm = JminusOp(self.name)._apply_operator_JzKetCoupled(ket, **options)
         return (jp - jm)/(Integer(2)*I)
 
     #-------------------------------------------------------------------------
@@ -370,7 +330,7 @@ class JzOp(SpinOpBase, HermitianOperator):
 
     _coord = 'z'
 
-    basis = 'Jz'
+    basis = 'JzKet'
 
     def matrix_element(self, j, m, jp, mp):
         result = hbar*mp
@@ -393,6 +353,13 @@ class JzOp(SpinOpBase, HermitianOperator):
 
     def _eval_commutator_JminusOp(self, other):
         return -hbar*JminusOp(self.name)
+
+    #-------------------------------------------------------------------------
+    # _apply_* methods
+    #-------------------------------------------------------------------------
+
+    def _apply_operator_JzKet(self, ket, **options):
+        return hbar * ket.m * ket
 
     #-------------------------------------------------------------------------
     # _represent_* methods
@@ -447,27 +414,7 @@ class J2Op(SpinOpBase, HermitianOperator):
     # _apply_* methods
     #-------------------------------------------------------------------------
 
-    def _apply_operator_JxKet(self, ket, **options):
-        j = ket.j
-        return hbar**2*j*(j+1)*ket
-
-    def _apply_operator_JxKetCoupled(self, ket, **options):
-        j = ket.j
-        return hbar**2*j*(j+1)*ket
-
-    def _apply_operator_JyKet(self, ket, **options):
-        j = ket.j
-        return hbar**2*j*(j+1)*ket
-
-    def _apply_operator_JyKetCoupled(self, ket, **options):
-        j = ket.j
-        return hbar**2*j*(j+1)*ket
-
-    def _apply_operator_JzKet(self, ket, **options):
-        j = ket.j
-        return hbar**2*j*(j+1)*ket
-
-    def _apply_operator_JzKetCoupled(self, ket, **options):
+    def _apply_operator_SpinState(self, ket, **options):
         j = ket.j
         return hbar**2*j*(j+1)*ket
 
@@ -1049,6 +996,21 @@ class SpinState(State):
     # Rewrite method
     #-------------------------------------------------------------------------
 
+    def _eval_rewrite_as_JxKet(self, *args, **options):
+        if isinstance(self, Bra):
+            return self._rewrite_basis(Jx, JxBra, **options)
+        return self._rewrite_basis(Jx, JxKet, **options)
+
+    def _eval_rewrite_as_JyKet(self, *args, **options):
+        if isinstance(self, Bra):
+            return self._rewrite_basis(Jy, JyBra, **options)
+        return self._rewrite_basis(Jy, JyKet, **options)
+
+    def _eval_rewrite_as_JzKet(self, *args, **options):
+        if isinstance(self, Bra):
+            return self._rewrite_basis(Jz, JzBra, **options)
+        return self._rewrite_basis(Jz, JzKet, **options)
+
     def _rewrite_basis(self, basis, evect, **options):
         from sympy.physics.quantum.represent import represent
         j = self.j
@@ -1239,7 +1201,7 @@ class JzKet(SpinState, Ket):
     Rewriting the JzKet in terms of eigenkets of the Jx operator:
     Note: that the resulting eigenstates are JxKet's
 
-        >>> JzKet(1,1).rewrite("Jx")
+        >>> JzKet(1,1).rewrite(JxKet)
         |1,-1>/2 - sqrt(2)*|1,0>/2 + |1,1>/2
 
     Get the vector representation of a state in terms of the basis elements
@@ -1276,7 +1238,7 @@ class JzKet(SpinState, Ket):
     A TensorProduct can be rewritten, in which case the eigenstates that make
     up the tensor product is rewritten to the new basis:
 
-        >>> TensorProduct(JzKet(1,1),JxKet(1,1)).rewrite('Jz')
+        >>> TensorProduct(JzKet(1,1),JxKet(1,1)).rewrite(JzKet)
         |1,1>x|1,-1>/2 + sqrt(2)*|1,1>x|1,0>/2 + |1,1>x|1,1>/2
 
     The represent method for TensorProduct's gives the vector representation of
@@ -1378,24 +1340,6 @@ class CoupledSpinState(SpinState):
     @property
     def coupled_n(self):
         return CoupledSpinState._eval_coupling(self.label[3], len(self.label[2]))[0]
-
-    #-------------------------------------------------------------------------
-    # _represent_* methods
-    #-------------------------------------------------------------------------
-
-    def _represent_coupled_base(self, **options):
-        evect = self.uncoupled_class()
-        if not self.j.is_number:
-            raise ValueError('State must not have symbolic j value to represent')
-        if not self.hilbert_space.dimension.is_number:
-            raise ValueError('State must not have symbolic j values to represent')
-        result = zeros(self.hilbert_space.dimension, 1)
-        if self.j == int(self.j):
-            start = self.j**2
-        else:
-            start = (2*self.j-1)*(1+2*self.j)/4
-        result[start:start+2*self.j+1,0] = evect(self.j, self.m)._represent_base(**options)
-        return result
 
     #-------------------------------------------------------------------------
     # _eval_* methods
@@ -1502,20 +1446,53 @@ class CoupledSpinState(SpinState):
             # Temporary fix:
             return ComplexSpace(2*j+1)
 
-    def _eval_rewrite_as_Jx(self, *args, **options):
+    def _eval_rewrite_as_JxKet(self, *args, **options):
         if isinstance(self, Bra):
             return self._rewrite_basis(Jx, JxBraCoupled, **options)
         return self._rewrite_basis(Jx, JxKetCoupled, **options)
 
-    def _eval_rewrite_as_Jy(self, *args, **options):
+    def _eval_rewrite_as_JyKet(self, *args, **options):
         if isinstance(self, Bra):
             return self._rewrite_basis(Jy, JyBraCoupled, **options)
         return self._rewrite_basis(Jy, JyKetCoupled, **options)
 
-    def _eval_rewrite_as_Jz(self, *args, **options):
+    def _eval_rewrite_as_JzKet(self, *args, **options):
         if isinstance(self, Bra):
             return self._rewrite_basis(Jz, JzBraCoupled, **options)
         return self._rewrite_basis(Jz, JzKetCoupled, **options)
+
+    def _eval_rewrite_as_JxKetCoupled(self, *args, **options):
+        if isinstance(self, Bra):
+            return self._rewrite_basis(Jx, JxBraCoupled, **options)
+        return self._rewrite_basis(Jx, JxKetCoupled, **options)
+
+    def _eval_rewrite_as_JyKetCoupled(self, *args, **options):
+        if isinstance(self, Bra):
+            return self._rewrite_basis(Jy, JyBraCoupled, **options)
+        return self._rewrite_basis(Jy, JyKetCoupled, **options)
+
+    def _eval_rewrite_as_JzKetCoupled(self, *args, **options):
+        if isinstance(self, Bra):
+            return self._rewrite_basis(Jz, JzBraCoupled, **options)
+        return self._rewrite_basis(Jz, JzKetCoupled, **options)
+
+    #-------------------------------------------------------------------------
+    # _represent_* methods
+    #-------------------------------------------------------------------------
+
+    def _represent_base(self, **options):
+        evect = self.uncoupled_class()
+        if not self.j.is_number:
+            raise ValueError('State must not have symbolic j value to represent')
+        if not self.hilbert_space.dimension.is_number:
+            raise ValueError('State must not have symbolic j values to represent')
+        result = zeros(self.hilbert_space.dimension, 1)
+        if self.j == int(self.j):
+            start = self.j**2
+        else:
+            start = (2*self.j-1)*(1+2*self.j)/4
+        result[start:start+2*self.j+1,0] = evect(self.j, self.m)._represent_base(**options)
+        return result
 
     #-------------------------------------------------------------------------
     # Printing methods
@@ -1572,7 +1549,7 @@ class CoupledSpinState(SpinState):
         )
 
 
-class JxKetCoupled(CoupledSpinState, Ket):
+class JxKetCoupled(JxKet, CoupledSpinState):
     """Coupled eigenket of Jx.
 
     See JzKetCoupled for the usage of coupled spin eigenstates.
@@ -1600,16 +1577,16 @@ class JxKetCoupled(CoupledSpinState, Ket):
         return self._represent_JzOp(None, **options)
 
     def _represent_JxOp(self, basis, **options):
-        return self._represent_coupled_base(**options)
+        return self._represent_base(**options)
 
     def _represent_JyOp(self, basis, **options):
-        return self._represent_coupled_base(alpha=3*pi/2, **options)
+        return self._represent_base(alpha=3*pi/2, **options)
 
     def _represent_JzOp(self, basis, **options):
-        return self._represent_coupled_base(beta=pi/2, **options)
+        return self._represent_base(beta=pi/2, **options)
 
 
-class JxBraCoupled(CoupledSpinState, Bra):
+class JxBraCoupled(JxBra, CoupledSpinState):
     """Coupled eigenbra of Jx.
 
     See JzKetCoupled for the usage of coupled spin eigenstates.
@@ -1630,7 +1607,7 @@ class JxBraCoupled(CoupledSpinState, Bra):
         return JxBra
 
 
-class JyKetCoupled(CoupledSpinState, Ket):
+class JyKetCoupled(JyKet, CoupledSpinState):
     """Coupled eigenket of Jy.
 
     See JzKetCoupled for the usage of coupled spin eigenstates.
@@ -1658,16 +1635,16 @@ class JyKetCoupled(CoupledSpinState, Ket):
         return self._represent_JzOp(None, **options)
 
     def _represent_JxOp(self, basis, **options):
-        return self._represent_coupled_base(gamma=pi/2, **options)
+        return self._represent_base(gamma=pi/2, **options)
 
     def _represent_JyOp(self, basis, **options):
-        return self._represent_coupled_base(**options)
+        return self._represent_base(**options)
 
     def _represent_JzOp(self, basis, **options):
-        return self._represent_coupled_base(alpha=3*pi/2,beta=-pi/2,gamma=pi/2, **options)
+        return self._represent_base(alpha=3*pi/2,beta=-pi/2,gamma=pi/2, **options)
 
 
-class JyBraCoupled(CoupledSpinState, Bra):
+class JyBraCoupled(JyBra, CoupledSpinState):
     """Coupled eigenbra of Jy.
 
     See JzKetCoupled for the usage of coupled spin eigenstates.
@@ -1688,7 +1665,7 @@ class JyBraCoupled(CoupledSpinState, Bra):
         return JyBra
 
 
-class JzKetCoupled(CoupledSpinState, Ket):
+class JzKetCoupled(JzKet, CoupledSpinState):
     """Coupled eigenket of Jz
 
     Spin state that is an eigenket of Jz which represents the coupling of
@@ -1774,13 +1751,14 @@ class JzKetCoupled(CoupledSpinState, Ket):
     Rewriting the JzKetCoupled in terms of eigenkets of the Jx operator:
     Note: that the resulting eigenstates are JxKetCoupled
 
-        >>> JzKetCoupled(1,1,(1,1)).rewrite("Jx")
+        >>> from sympy.physics.quantum .spin import JxKetCoupled
+        >>> JzKetCoupled(1,1,(1,1)).rewrite(JxKetCoupled)
         |1,-1,j1=1,j2=1>/2 - sqrt(2)*|1,0,j1=1,j2=1>/2 + |1,1,j1=1,j2=1>/2
 
     The rewrite method can be used to convert a coupled state to an uncoupled
     state. This is done by passing coupled=False to the rewrite function:
 
-        >>> JzKetCoupled(1, 0, (1, 1)).rewrite('Jz', coupled=False)
+        >>> JzKetCoupled(1, 0, (1, 1)).rewrite(JzKetCoupled, coupled=False)
         -sqrt(2)*|1,-1>x|1,1>/2 + sqrt(2)*|1,1>x|1,-1>/2
 
     Get the vector representation of a state in terms of the basis elements
@@ -1820,16 +1798,16 @@ class JzKetCoupled(CoupledSpinState, Ket):
         return self._represent_JzOp(None, **options)
 
     def _represent_JxOp(self, basis, **options):
-        return self._represent_coupled_base(beta=3*pi/2, **options)
+        return self._represent_base(beta=3*pi/2, **options)
 
     def _represent_JyOp(self, basis, **options):
-        return self._represent_coupled_base(alpha=3*pi/2,beta=pi/2,gamma=pi/2, **options)
+        return self._represent_base(alpha=3*pi/2,beta=pi/2,gamma=pi/2, **options)
 
     def _represent_JzOp(self, basis, **options):
-        return self._represent_coupled_base(**options)
+        return self._represent_base(**options)
 
 
-class JzBraCoupled(CoupledSpinState, Bra):
+class JzBraCoupled(JzBra, CoupledSpinState):
     """Coupled eigenbra of Jz.
 
     See the JzKetCoupled for the usage of coupled spin eigenstates.
