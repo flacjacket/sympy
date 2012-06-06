@@ -1,8 +1,7 @@
 """Quantum mechanical angular momemtum."""
 
 from sympy import (Add, binomial, cos, exp, Expr, factorial, I, Integer, Mul,
-                   pi, Rational, S, sin, simplify, sqrt, Sum, symbols, sympify,
-                   Tuple)
+                   pi, S, sin, simplify, sqrt, Sum, symbols, sympify, Tuple)
 from sympy.matrices.matrices import zeros
 from sympy.printing.pretty.stringpict import prettyForm, stringPict
 
@@ -94,8 +93,11 @@ class SpinOpBase(object):
     # represent methods
     #-------------------------------------------------------------------------
 
+    def _represent_default_basis(self, **options):
+        return self._represent_JzOp(None, **options)
+
     def _represent_base(self, basis, **options):
-        j = options.get('j', Rational(1,2))
+        j = options.get('j', S(1)/2)
         size, mvals = m_values(j)
         result = zeros(size, size)
         for p in range(size):
@@ -150,9 +152,8 @@ class JplusOp(SpinOpBase, Operator):
     basis = 'JzKet'
 
     def matrix_element(self, j, m, jp, mp):
-        result = hbar*sqrt(j*(j+S.One)-mp*(mp+S.One))
-        result *= KroneckerDelta(m, mp+1)
-        result *= KroneckerDelta(j, jp)
+        result = hbar * sqrt(j * (j + S.One) - mp * (mp+S.One))
+        result *= KroneckerDelta(m, mp+1) * KroneckerDelta(j, jp)
         return result
 
     #-------------------------------------------------------------------------
@@ -183,9 +184,6 @@ class JplusOp(SpinOpBase, Operator):
     # _represent_* methods
     #-------------------------------------------------------------------------
 
-    def _represent_default_basis(self, **options):
-        return self._represent_JzOp(None, **options)
-
     def _represent_JzOp(self, basis, **options):
         return self._represent_base(basis, **options)
 
@@ -198,9 +196,8 @@ class JminusOp(SpinOpBase, Operator):
     basis = 'JzKet'
 
     def matrix_element(self, j, m, jp, mp):
-        result = hbar*sqrt(j*(j+S.One)-mp*(mp-S.One))
-        result *= KroneckerDelta(m, mp-1)
-        result *= KroneckerDelta(j, jp)
+        result = hbar * sqrt(j * (j + S.One) - mp * (mp-S.One))
+        result *= KroneckerDelta(m, mp-1) * KroneckerDelta(j, jp)
         return result
 
     #-------------------------------------------------------------------------
@@ -228,9 +225,6 @@ class JminusOp(SpinOpBase, Operator):
     # _represent_* methods
     #-------------------------------------------------------------------------
 
-    def _represent_default_basis(self, **options):
-        return self._represent_JzOp(None, **options)
-
     def _represent_JzOp(self, basis, **options):
         return self._represent_base(basis, **options)
 
@@ -241,6 +235,10 @@ class JxOp(SpinOpBase, HermitianOperator):
     _coord = 'x'
 
     basis = 'JxKet'
+
+    def matrix_element(self, j, m, jp, mp):
+        # Basis projection matrix element
+        return hbar * KroneckerDelta(m, mp) * KroneckerDelta(j, jp) * mp
 
     #-------------------------------------------------------------------------
     # _eval_* methods
@@ -271,8 +269,8 @@ class JxOp(SpinOpBase, HermitianOperator):
     # _represent_* methods
     #-------------------------------------------------------------------------
 
-    def _represent_default_basis(self, **options):
-        return self._represent_JzOp(None, **options)
+    def _represent_JxOp(self, basis, **options):
+        return self._represent_base(basis, **options)
 
     def _represent_JzOp(self, basis, **options):
         jp = JplusOp(self.name)._represent_JzOp(basis, **options)
@@ -286,6 +284,10 @@ class JyOp(SpinOpBase, HermitianOperator):
     _coord = 'y'
 
     basis = 'JyKet'
+
+    def matrix_element(self, j, m, jp, mp):
+        # Basis projection matrix element
+        return hbar * KroneckerDelta(m, mp) * KroneckerDelta(j, jp) * mp
 
     #-------------------------------------------------------------------------
     # _eval_* methods
@@ -316,8 +318,8 @@ class JyOp(SpinOpBase, HermitianOperator):
     # _represent_* methods
     #-------------------------------------------------------------------------
 
-    def _represent_default_basis(self, **options):
-        return self._represent_JzOp(None, **options)
+    def _represent_JyOp(self, basis, **options):
+        return self._represent_base(basis, **options)
 
     def _represent_JzOp(self, basis, **options):
         jp = JplusOp(self.name)._represent_JzOp(basis, **options)
@@ -333,10 +335,8 @@ class JzOp(SpinOpBase, HermitianOperator):
     basis = 'JzKet'
 
     def matrix_element(self, j, m, jp, mp):
-        result = hbar*mp
-        result *= KroneckerDelta(m, mp)
-        result *= KroneckerDelta(j, jp)
-        return result
+        # Basis projection matrix element
+        return hbar * KroneckerDelta(m, mp) * KroneckerDelta(j, jp) * mp
 
     #-------------------------------------------------------------------------
     # _eval_* methods
@@ -365,9 +365,6 @@ class JzOp(SpinOpBase, HermitianOperator):
     # _represent_* methods
     #-------------------------------------------------------------------------
 
-    def _represent_default_basis(self, **options):
-        return self._represent_JzOp(None, **options)
-
     def _represent_JzOp(self, basis, **options):
         return self._represent_base(basis, **options)
 
@@ -378,28 +375,15 @@ class J2Op(SpinOpBase, HermitianOperator):
     _coord = '2'
 
     def matrix_element(self, j, m, jp, mp):
-        result = (hbar**2)*j*(j+1)
-        result *= KroneckerDelta(m, mp)
-        result *= KroneckerDelta(j, jp)
+        result = hbar**2 * j * (j + 1)
+        result *= KroneckerDelta(m, mp) * KroneckerDelta(j, jp)
         return result
 
     #-------------------------------------------------------------------------
     # _eval_* methods
     #-------------------------------------------------------------------------
 
-    def _eval_commutator_JxOp(self, other):
-        return S.Zero
-
-    def _eval_commutator_JyOp(self, other):
-        return S.Zero
-
-    def _eval_commutator_JzOp(self, other):
-        return S.Zero
-
-    def _eval_commutator_JplusOp(self, other):
-        return S.Zero
-
-    def _eval_commutator_JminusOp(self, other):
+    def _eval_commutator_SpinOpBase(self, other):
         return S.Zero
 
     def _eval_rewrite_as_xyz(self, *args):
@@ -408,7 +392,7 @@ class J2Op(SpinOpBase, HermitianOperator):
     def _eval_rewrite_as_plusminus(self, *args):
         a = args[0]
         return JzOp(a)**2 +\
-            Rational(1,2)*(JplusOp(a)*JminusOp(a) + JminusOp(a)*JplusOp(a))
+            (JplusOp(a)*JminusOp(a) + JminusOp(a)*JplusOp(a)) / 2
 
     #-------------------------------------------------------------------------
     # _apply_* methods
@@ -421,9 +405,6 @@ class J2Op(SpinOpBase, HermitianOperator):
     #-------------------------------------------------------------------------
     # _represent_* methods
     #-------------------------------------------------------------------------
-
-    def _represent_default_basis(self, **options):
-        return self._represent_JzOp(None, **options)
 
     def _represent_JzOp(self, basis, **options):
         return self._represent_base(basis, **options)
@@ -623,7 +604,7 @@ class Rotation(UnitaryOperator):
 
     def _print_operator_name_pretty(self, printer, *args):
         if printer._use_unicode:
-            return prettyForm(u"\u211B" + u" ")
+            return prettyForm(u"\u211B ")
         else:
             return prettyForm("R ")
 
@@ -635,7 +616,7 @@ class Rotation(UnitaryOperator):
     #-------------------------------------------------------------------------
 
     def _represent_base(self, basis, **options):
-        j = sympify(options.get('j', Rational(1,2)))
+        j = sympify(options.get('j', S(1)/2))
         # TODO: move evaluation up to represent function/implement elsewhere
         evaluate = sympify(options.get('doit'))
         size, mvals = m_values(j)
@@ -975,12 +956,9 @@ class SpinState(State):
     # _represent_* methods
     #-------------------------------------------------------------------------
 
-    def _represent_base(self, **options):
+    def _represent_base(self, alpha, beta, gamma):
         j = self.j
         m = self.m
-        alpha = sympify(options.get('alpha', 0))
-        beta = sympify(options.get('beta', 0))
-        gamma = sympify(options.get('gamma', 0))
         size, mvals = m_values(j)
         result = zeros(size, 1)
         # TODO: Use KroneckerDelta if all Euler angles == 0
@@ -991,6 +969,18 @@ class SpinState(State):
             else:
                 result[p,0] = Rotation.D(self.j, mval, self.m, alpha, beta, gamma)
         return result
+
+    def _represent_JxOp(self, basis, **options):
+        angles = self._euler_angles(Jx)
+        return self._represent_base(*angles)
+
+    def _represent_JyOp(self, basis, **options):
+        angles = self._euler_angles(Jy)
+        return self._represent_base(*angles)
+
+    def _represent_JzOp(self, basis, **options):
+        angles = self._euler_angles(Jz)
+        return self._represent_base(*angles)
 
     #-------------------------------------------------------------------------
     # Rewrite method
@@ -1029,14 +1019,8 @@ class SpinState(State):
                 return uncouple(result)
             return result
         else:
-            i = 0
-            mi = symbols('mi')
-            # make sure not to introduce a symbol already in the state
-            while self.subs(mi,0) != self:
-                i += 1
-                mi = symbols('mi%d' % i)
 
-            # TODO: better way to get angles of rotation
+            """# TODO: better way to get angles of rotation
             if isinstance(self, CoupledSpinState):
                 test_args = (0,mi,(0,0))
             else:
@@ -1044,10 +1028,17 @@ class SpinState(State):
             if isinstance(self, Ket):
                 angles = represent(self.__class__(*test_args),basis=basis)[0].args[3:6]
             else:
-                angles = represent(self.__class__(*test_args),basis=basis)[0].args[0].args[3:6]
+                angles = represent(self.__class__(*test_args),basis=basis)[0].args[0].args[3:6]"""
+            angles = self._euler_angles(basis)
             if angles == (0,0,0):
                 return self
 
+            i = 0
+            mi = symbols('mi')
+            # make sure not to introduce a symbol already in the state
+            while self.subs(mi,0) != self:
+                i += 1
+                mi = symbols('mi%d' % i)
             state = evect(j, mi, *args)
             lt = Rotation.D(j, mi, self.m, *angles)
             return Sum(lt * state, (mi,-j,j))
@@ -1073,21 +1064,21 @@ class JxKet(SpinState, Ket):
     def coupled_class(self):
         return JxKetCoupled
 
+    @classmethod
+    def _euler_angles(cls, basis):
+        if isinstance(basis, JxOp):
+            return 0, 0, 0
+        elif isinstance(basis, JyOp):
+            return 3 * pi / 2, 0, 0
+        elif isinstance(basis, JzOp):
+            return 0, pi / 2, 0
+
     #-------------------------------------------------------------------------
     # _represent_* methods
     #-------------------------------------------------------------------------
 
     def _represent_default_basis(self, **options):
         return self._represent_JxOp(None, **options)
-
-    def _represent_JxOp(self, basis, **options):
-        return self._represent_base(**options)
-
-    def _represent_JyOp(self, basis, **options):
-        return self._represent_base(alpha=3*pi/2, **options)
-
-    def _represent_JzOp(self, basis, **options):
-        return self._represent_base(beta=pi/2, **options)
 
 class JxBra(SpinState, Bra):
     """Eigenbra of Jx.
@@ -1108,6 +1099,10 @@ class JxBra(SpinState, Bra):
     @classmethod
     def coupled_class(self):
         return JxBraCoupled
+
+    @classmethod
+    def _euler_angles(cls, basis):
+        return cls.dual_class()._euler_angles(basis)
 
 
 class JyKet(SpinState, Ket):
@@ -1130,21 +1125,21 @@ class JyKet(SpinState, Ket):
     def coupled_class(self):
         return JyKetCoupled
 
+    @classmethod
+    def _euler_angles(cls, basis):
+        if isinstance(basis, JxOp):
+            return 0, 0, pi / 2
+        elif isinstance(basis, JyOp):
+            return 0, 0, 0
+        elif isinstance(basis, JzOp):
+            return 3 * pi / 2, -pi / 2, pi / 2
+
     #-------------------------------------------------------------------------
     # _represent_*
     #-------------------------------------------------------------------------
 
     def _represent_default_basis(self, **options):
         return self._represent_JyOp(None, **options)
-
-    def _represent_JxOp(self, basis, **options):
-        return self._represent_base(gamma=pi/2, **options)
-
-    def _represent_JyOp(self, basis, **options):
-        return self._represent_base(**options)
-
-    def _represent_JzOp(self, basis, **options):
-        return self._represent_base(alpha=3*pi/2,beta=-pi/2,gamma=pi/2, **options)
 
 
 class JyBra(SpinState, Bra):
@@ -1166,6 +1161,10 @@ class JyBra(SpinState, Bra):
     @classmethod
     def coupled_class(self):
         return JyBraCoupled
+
+    @classmethod
+    def _euler_angles(cls, basis):
+        return cls.dual_class()._euler_angles(basis)
 
 
 class JzKet(SpinState, Ket):
@@ -1284,21 +1283,21 @@ class JzKet(SpinState, Ket):
     def coupled_class(self):
         return JzKetCoupled
 
+    @classmethod
+    def _euler_angles(cls, basis):
+        if isinstance(basis, JxOp):
+            return 0, 3 * pi / 2, 0
+        elif isinstance(basis, JyOp):
+            return 3 * pi / 2, pi / 2, pi / 2
+        elif isinstance(basis, JzOp):
+            return 0, 0, 0
+
     #-------------------------------------------------------------------------
     # _represent_* methods
     #-------------------------------------------------------------------------
 
     def _represent_default_basis(self, **options):
         return self._represent_JzOp(None, **options)
-
-    def _represent_JxOp(self, basis, **options):
-        return self._represent_base(beta=3*pi/2, **options)
-
-    def _represent_JyOp(self, basis, **options):
-        return self._represent_base(alpha=3*pi/2,beta=pi/2,gamma=pi/2, **options)
-
-    def _represent_JzOp(self, basis, **options):
-        return self._represent_base(**options)
 
 
 class JzBra(SpinState, Bra):
@@ -1320,6 +1319,10 @@ class JzBra(SpinState, Bra):
     @classmethod
     def coupled_class(self):
         return JzBraCoupled
+
+    @classmethod
+    def _euler_angles(cls, basis):
+        return cls.dual_class()._euler_angles(basis)
 
 
 class CoupledSpinState(SpinState):
@@ -1480,18 +1483,14 @@ class CoupledSpinState(SpinState):
     # _represent_* methods
     #-------------------------------------------------------------------------
 
-    def _represent_base(self, **options):
+    def _represent_base(self, *angles):
         evect = self.uncoupled_class()
-        if not self.j.is_number:
-            raise ValueError('State must not have symbolic j value to represent')
-        if not self.hilbert_space.dimension.is_number:
-            raise ValueError('State must not have symbolic j values to represent')
         result = zeros(self.hilbert_space.dimension, 1)
         if self.j == int(self.j):
             start = self.j**2
         else:
             start = (2*self.j-1)*(1+2*self.j)/4
-        result[start:start+2*self.j+1,0] = evect(self.j, self.m)._represent_base(**options)
+        result[start:start+2*self.j+1,0] = evect(self.j, self.m)._represent_base(*angles)
         return result
 
     #-------------------------------------------------------------------------
@@ -1569,22 +1568,6 @@ class JxKetCoupled(JxKet, CoupledSpinState):
     def uncoupled_class(self):
         return JxKet
 
-    #-------------------------------------------------------------------------
-    # _represent_* methods
-    #-------------------------------------------------------------------------
-
-    def _represent_default_basis(self, **options):
-        return self._represent_JzOp(None, **options)
-
-    def _represent_JxOp(self, basis, **options):
-        return self._represent_base(**options)
-
-    def _represent_JyOp(self, basis, **options):
-        return self._represent_base(alpha=3*pi/2, **options)
-
-    def _represent_JzOp(self, basis, **options):
-        return self._represent_base(beta=pi/2, **options)
-
 
 class JxBraCoupled(JxBra, CoupledSpinState):
     """Coupled eigenbra of Jx.
@@ -1626,22 +1609,6 @@ class JyKetCoupled(JyKet, CoupledSpinState):
     @classmethod
     def uncoupled_class(self):
         return JyKet
-
-    #-------------------------------------------------------------------------
-    # _represent_* methods
-    #-------------------------------------------------------------------------
-
-    def _represent_default_basis(self, **options):
-        return self._represent_JzOp(None, **options)
-
-    def _represent_JxOp(self, basis, **options):
-        return self._represent_base(gamma=pi/2, **options)
-
-    def _represent_JyOp(self, basis, **options):
-        return self._represent_base(**options)
-
-    def _represent_JzOp(self, basis, **options):
-        return self._represent_base(alpha=3*pi/2,beta=-pi/2,gamma=pi/2, **options)
 
 
 class JyBraCoupled(JyBra, CoupledSpinState):
@@ -1789,22 +1756,6 @@ class JzKetCoupled(JzKet, CoupledSpinState):
     @classmethod
     def uncoupled_class(self):
         return JzKet
-
-    #-------------------------------------------------------------------------
-    # _represent_* methods
-    #-------------------------------------------------------------------------
-
-    def _represent_default_basis(self, **options):
-        return self._represent_JzOp(None, **options)
-
-    def _represent_JxOp(self, basis, **options):
-        return self._represent_base(beta=3*pi/2, **options)
-
-    def _represent_JyOp(self, basis, **options):
-        return self._represent_base(alpha=3*pi/2,beta=pi/2,gamma=pi/2, **options)
-
-    def _represent_JzOp(self, basis, **options):
-        return self._represent_base(**options)
 
 
 class JzBraCoupled(JzBra, CoupledSpinState):
