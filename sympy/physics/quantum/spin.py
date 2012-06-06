@@ -596,20 +596,23 @@ class Rotation(UnitaryOperator):
         return Rotation(-self.gamma, -self.beta, -self.alpha)
 
     #-------------------------------------------------------------------------
-    # Printing methods
+    # _apply_* methods
     #-------------------------------------------------------------------------
 
-    def _print_operator_name(self, printer, *args):
-        return 'R'
-
-    def _print_operator_name_pretty(self, printer, *args):
-        if printer._use_unicode:
-            return prettyForm(u"\u211B ")
+    def _apply_operator_SpinState(self, ket, **options):
+        # TODO: Symbolic
+        j = ket.j
+        m = ket.m
+        spin_args = ket.args[2:]
+        spin_cls = ket.__class__
+        angles = self.alpha, self.beta, self.gamma
+        if j.is_number:
+            _, mvals = m_values(ket.j)
+            term = [Rotation.D(j, m, mp, *angles) * spin_cls(j, mp, *spin_args) for mp in mvals]
+            return Add(*term)
         else:
-            return prettyForm("R ")
-
-    def _print_operator_name_latex(self, printer, *args):
-        return r'\mathcal{R}'
+            mp = symbols('mp')
+            return Sum(Rotation.D(j, m, mp, *angles) * spin_cls(j, mp, *spin_args), (mp, -j, j))
 
     #-------------------------------------------------------------------------
     # _represent_* methods
@@ -635,6 +638,22 @@ class Rotation(UnitaryOperator):
 
     def _represent_JzOp(self, basis, **options):
         return self._represent_base(basis, **options)
+
+    #-------------------------------------------------------------------------
+    # Printing methods
+    #-------------------------------------------------------------------------
+
+    def _print_operator_name(self, printer, *args):
+        return 'R'
+
+    def _print_operator_name_pretty(self, printer, *args):
+        if printer._use_unicode:
+            return prettyForm(u"\u211B ")
+        else:
+            return prettyForm("R ")
+
+    def _print_operator_name_latex(self, printer, *args):
+        return r'\mathcal{R}'
 
 
 class WignerD(Expr):
@@ -791,7 +810,7 @@ class WignerD(Expr):
             # d(j, m, mp, beta+pi) = (-1)**(j-mp) * d(j, m, -mp, beta)
             # This happens to be almost the same as in Eq.(10), Section 4.16,
             # except that we need to substitute -mp for mp.
-            size, mvals = m_values(j)
+            _, mvals = m_values(j)
             for mpp in mvals:
                 r += Rotation.d(j, m, mpp, pi/2).doit() * \
                      (cos(-mpp*beta)+I*sin(-mpp*beta)) * \

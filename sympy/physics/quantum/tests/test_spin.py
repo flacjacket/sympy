@@ -3062,6 +3062,32 @@ def test_wignerd():
     assert Rotation.D(j, m, mp, alpha, beta, gamma) == WignerD(j, m, mp, alpha, beta, gamma)
     assert Rotation.d(j, m, mp, beta) == WignerD(j, m, mp, 0, beta, 0)
 
+def test_rotation():
+    # Numerical
+    assert qapply(Rotation(pi/2, -pi/2, 0) * JzKet(1, 0)) == \
+        Rotation.D(1, 0, 1, pi/2, -pi/2, 0) * JzKet(1, 1) + \
+        Rotation.D(1, 0, 0, pi/2, -pi/2, 0) * JzKet(1, 0) + \
+        Rotation.D(1, 0, -1, pi/2, -pi/2, 0) * JzKet(1, -1)
+    assert qapply(Rotation(pi/2, -pi/2, 0) * JzKetCoupled(1, 0, (1, 1))) == \
+        Rotation.D(1, 0, 1, pi/2, -pi/2, 0) * JzKetCoupled(1, 1, (1, 1)) + \
+        Rotation.D(1, 0, 0, pi/2, -pi/2, 0) * JzKetCoupled(1, 0, (1, 1)) + \
+        Rotation.D(1, 0, -1, pi/2, -pi/2, 0) * JzKetCoupled(1, -1, (1, 1))
+    # Symbolic angles
+    alpha, beta, gamma = symbols("alpha beta gamma")
+    assert qapply(Rotation(alpha, beta, gamma) * JzKet(1, 0)) == \
+        Rotation.D(1, 0, 1, alpha, beta, gamma) * JzKet(1, 1) + \
+        Rotation.D(1, 0, 0, alpha, beta, gamma) * JzKet(1, 0) + \
+        Rotation.D(1, 0, -1, alpha, beta, gamma) * JzKet(1, -1)
+    assert qapply(Rotation(alpha, beta, gamma) * JzKetCoupled(1, 0, (1, 1))) == \
+        Rotation.D(1, 0, 1, alpha, beta, gamma) * JzKetCoupled(1, 1, (1, 1)) + \
+        Rotation.D(1, 0, 0, alpha, beta, gamma) * JzKetCoupled(1, 0, (1, 1)) + \
+        Rotation.D(1, 0, -1, alpha, beta, gamma) * JzKetCoupled(1, -1, (1, 1))
+    # Symbolic angles and state
+    assert qapply(Rotation(alpha, beta, gamma) * JzKet(j, m)) == \
+        Sum(Rotation.D(j, m, mp, alpha, beta, gamma) * JzKet(j, mp), (mp, -j, j))
+    assert qapply(Rotation(alpha, beta, gamma) * JzKetCoupled(j, m, (j1, j2))) == \
+        Sum(Rotation.D(j, m, mp, alpha, beta, gamma) * JzKetCoupled(j, mp, (j1, j2)), (mp, -j, j))
+
 def test_jplus():
     assert Commutator(Jplus, Jminus).doit() == 2*hbar*Jz
     assert Jplus.matrix_element(1,1,1,1) == 0
