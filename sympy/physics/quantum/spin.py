@@ -3,9 +3,12 @@
 from sympy import (Add, binomial, cos, exp, Expr, factorial, I, Integer, Mul,
                    pi, Rational, S, sin, simplify, sqrt, Sum, symbols, sympify,
                    Tuple)
+from sympy.core.compatibility import permutations, combinations_with_replacement
 from sympy.matrices.matrices import zeros
 from sympy.printing.pretty.stringpict import prettyForm, stringPict
+from sympy.utilities.iterables import flatten
 
+from sympy.physics.quantum.cg import CG
 from sympy.physics.quantum.qexpr import QExpr
 from sympy.physics.quantum.operator import (HermitianOperator, Operator,
                                             UnitaryOperator)
@@ -1919,7 +1922,6 @@ def couple(expr, coupling_list=None):
     return expr
 
 def _couple(tp, coupling_list):
-    from sympy.physics.quantum.cg import CG
     states = tp.args
     coupled_evect = states[0].coupled_class()
 
@@ -1935,7 +1937,7 @@ def _couple(tp, coupling_list):
     if any([n1 == n2 for n1, n2 in coupling_list]):
         raise ValueError('Spin spaces cannot couple to themselves')
     if all([sympify(n1).is_number and sympify(n2).is_number for n1, n2 in coupling_list]):
-        j_test = [0]*len(states)
+        j_test = [0] * len(states)
         for n1, n2 in coupling_list:
             if j_test[n1-1] == -1 or j_test[n2-1] == -1:
                 raise ValueError('Spaces coupling j_n\'s are referenced by smallest n value')
@@ -1951,19 +1953,18 @@ def _couple(tp, coupling_list):
     if all(state.j.is_number and state.m.is_number for state in states):
         # Numerical coupling
         # Iterate over difference between maximum possible j value of each coupling and the actual value
-        jcoupling_list = [(n1, n2, None) for n1, n2 in coupling_list]
-        coupling_n = CoupledSpinState._eval_coupling(jcoupling_list)
         diff_max = [ Add( *[ jn[n-1]-mn[n-1] for n in n1+n2 ] ) for n1, n2 in coupling_n ]
 
         result = []
         for order in range(diff_max[-1]+1):
             # Determine available configurations
             dim = len(coupling_list)
-            num = binomial(order+dim-1, order)
+            tot = binomial(order+dim-1, order)
 
-            for index in range(num):
-                diff_list = _confignum_to_difflist(index, order, dim)
-
+            perm = [permutations(comb) for comb in
+                    combinations_with_replacement(range(order+1), dim)
+                    if sum(comb) == order]
+            for diff_list in flatten([set(p) for p in perm], 1):
                 # Skip the configuration if non-physical
                 # This is a lazy check for physical states given the loose restrictions of diff_max
                 if any( [ d > m for d, m in zip(diff_list, diff_max) ] ):
