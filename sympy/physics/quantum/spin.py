@@ -1959,8 +1959,6 @@ def _couple(tp, coupling_list):
         for order in range(diff_max[-1]+1):
             # Determine available configurations
             dim = len(coupling_list)
-            tot = binomial(order+dim-1, order)
-
             perm = [permutations(comb) for comb in
                     combinations_with_replacement(range(order+1), dim)
                     if sum(comb) == order]
@@ -2140,14 +2138,14 @@ def _uncouple(state, jn, jcoupling):
 
     if j.is_number and m.is_number:
         diff_max = [ 2*x for x in jn ]
-        diff = Add(*jn) - m
-
-        n = len(jn)
-        tot = binomial(diff+n-1, diff)
+        order = Add(*jn) - m
+        dim = len(jn)
 
         result = []
-        for config_num in range(tot):
-            diff_list = _confignum_to_difflist(config_num, diff, n)
+        perm = [permutations(comb) for comb in
+                combinations_with_replacement(range(order+1), dim)
+                if sum(comb) == order]
+        for diff_list in flatten([set(p) for p in perm], 1):
             if any( [ d > p for d, p in zip(diff_list, diff_max) ] ):
                 continue
 
