@@ -28,7 +28,7 @@ def _init_python_printing(stringify_func):
     sys.displayhook = _displayhook
 
 
-def _init_ipython_printing(ip, stringify_func, use_latex, euler,
+def _init_ipython_printing(ip, stringify_func, png_latex, euler,
                            forecolor, backcolor, fontsize, latex_mode):
     """Setup printing in IPython interactive session. """
     try:
@@ -151,30 +151,27 @@ def _init_ipython_printing(ip, stringify_func, use_latex, euler,
             plaintext_formatter.for_type(cls, _print_plain)
 
         png_formatter = ip.display_formatter.formatters['image/png']
-        if use_latex in (True, 'png'):
-            debug("init_printing: using png formatter")
+        if png_latex in ('external', True):
+            debug("init_printing: using external latex formatter")
             for cls in printable_types:
                 png_formatter.for_type(cls, _print_latex_png)
-        elif use_latex == 'matplotlib':
-            debug("init_printing: using matplotlib formatter")
+        elif png_latex == 'matplotlib':
+            debug("init_printing: using matplotlib latex formatter")
             for cls in printable_types:
                 png_formatter.for_type(cls, _print_latex_matplotlib)
         else:
-            debug("init_printing: not using any png formatter")
+            debug("init_printing: not using any png latex formatter")
 
         latex_formatter = ip.display_formatter.formatters['text/latex']
-        if use_latex in (True, 'mathjax'):
-            debug("init_printing: using mathjax formatter")
-            for cls in printable_types:
-                latex_formatter.for_type(cls, _print_latex_text)
-        else:
-            debug("init_printing: not using mathjax formatter")
+        debug("init_printing: using text latex formatter")
+        for cls in printable_types:
+            latex_formatter.for_type(cls, _print_latex_text)
     else:
         ip.set_hook('result_display', _result_display)
 
 
 def init_printing(pretty_print=True, order=None, use_unicode=None,
-                  use_latex=None, wrap_line=None, num_columns=None,
+                  png_latex=None, wrap_line=None, num_columns=None,
                   no_global=False, ip=None, euler=False, forecolor='Black',
                   backcolor='Transparent', fontsize='10pt',
                   latex_mode='equation*'):
@@ -197,12 +194,11 @@ def init_printing(pretty_print=True, order=None, use_unicode=None,
     use_unicode: boolean or None
         If True, use unicode characters;
         if False, do not use unicode characters.
-    use_latex: string, boolean, or None
-        If True, use default latex rendering in GUI interfaces (png and mathjax);
-        if False, do not use latex rendering;
-        if 'png', enable latex rendering with an external latex compiler;
+    png_latex: string, boolean, or None
+        Generates a png of objects with LaTeX representations
+        If True or 'external', use external latex compiler;
         if 'matplotlib', enable latex rendering with matplotlib;
-        if 'mathjax', enable latex text generation for MathJax rendering (in IPython notebook).
+        if False, do not use png latex rendering;
     wrap_line: boolean
         If True, lines will wrap at the end;
         if False, they will not wrap but continue as one line.
@@ -286,9 +282,9 @@ def init_printing(pretty_print=True, order=None, use_unicode=None,
                 if use_unicode is None:
                     debug("init_printing: Setting use_unicode to True")
                     use_unicode = True
-                if use_latex is None:
-                    debug("init_printing: Setting use_latex to True")
-                    use_latex = True
+                if png_latex is None:
+                    debug("init_printing: Setting png_latex to True")
+                    png_latex = True
 
     if not no_global:
         Printer.set_global_settings(order=order, use_unicode=use_unicode,
@@ -306,7 +302,7 @@ def init_printing(pretty_print=True, order=None, use_unicode=None,
             stringify_func = lambda expr: _stringify_func(expr, order=order)
 
     if ip is not None and ip.__module__.startswith('IPython'):
-        _init_ipython_printing(ip, stringify_func, use_latex, euler, forecolor,
+        _init_ipython_printing(ip, stringify_func, png_latex, euler, forecolor,
                                backcolor, fontsize, latex_mode)
     else:
         _init_python_printing(stringify_func)
