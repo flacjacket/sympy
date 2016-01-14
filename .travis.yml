@@ -55,6 +55,8 @@ matrix:
             - liblapack-dev
             - gfortran
             - python-scipy
+      sudo: true
+      dist: trusty
 
     - python: "pypy"
       env:
