@@ -23,8 +23,11 @@ matrix:
             - libatlas-base-dev
             - liblapack-dev
             - gfortran
+            - python-scipy
       sudo: true
       dist: trusty
+      virtualenv:
+        system_site_packages: true
     - python: 3.5
       env:
         - TEST_GMPY="true"
@@ -45,6 +48,8 @@ matrix:
             - python-scipy
       sudo: true
       dist: trusty
+      virtualenv:
+        system_site_packages: true
 
 before_install:
   - if [[ "${FASTCACHE}" != "false" ]]; then
